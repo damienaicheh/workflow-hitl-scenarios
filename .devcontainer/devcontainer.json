@@ -6,6 +6,9 @@
         "azure-cli": {
             "version": "latest"
         },
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        },
         "ghcr.io/devcontainers/features/terraform:latest": {
             "version": "latest",
             "tflint": "latest"
@@ -15,7 +18,7 @@
             "version": "3.13"
         },
         "ghcr.io/va-h/devcontainers-features/uv:1": {},
-        "ghcr.io/devcontainers-extra/features/ruff:2.0.0": {},
+        "ghcr.io/devcontainers-extra/features/ruff:2.0.0": {}
     },
     "customizations": {
         "vscode": {
