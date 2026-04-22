@@ -18,8 +18,15 @@
             "version": "3.13"
         },
         "ghcr.io/va-h/devcontainers-features/uv:1": {},
-        "ghcr.io/devcontainers-extra/features/ruff:2.0.0": {}
+        "ghcr.io/devcontainers-extra/features/ruff:2.0.0": {},
+        "ghcr.io/jlaundry/devcontainer-features/azure-functions-core-tools:1": {}
     },
+    "forwardPorts": [
+        7071,
+        10000,
+        10001,
+        10002
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
@@ -33,7 +40,9 @@
                 "ms-python.vscode-pylance",
                 "charliermarsh.ruff",
                 "ms-python.bandit",
-                "ms-python.debugpy"
+                "ms-python.debugpy",
+                "ms-azuretools.vscode-azurefunctions",
+                 "humao.rest-client"
             ],
             "settings": {
                 "python.languageServer": "Pylance",
