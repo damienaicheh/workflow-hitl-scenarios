@@ -23,13 +23,13 @@ variable "environment" {
 variable "location" {
   description = "Azure deployment location"
   type        = string
-  default     = "swedencentral"
+  default     = "switzerlandnorth"
 }
 
 variable "region" {
   description = "Azure deployment region"
   type        = string
-  default     = "swc"
+  default     = "sln"
 }
 
 variable "tags" {
