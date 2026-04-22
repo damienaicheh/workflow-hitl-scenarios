@@ -1,12 +1,12 @@
-import argparse
-import asyncio
 import base64
 import os
 
 from agent_framework import Agent, MCPStdioTool
 from agent_framework.foundry import FoundryChatClient
+from agent_framework_devui import serve
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
+from tools.azure_devops_tools import AzureDevOpsTools
 
 load_dotenv(override=False)
 
@@ -74,46 +74,47 @@ def build_ado_mcp_tool() -> MCPStdioTool:
     )
 
 
-async def run_query(query: str) -> str:
+def main():
     credential = DefaultAzureCredential()
+    default_project = get_first_env("ADO_DEFAULT_PROJECT")
+    ado_tools = AzureDevOpsTools(
+        organization=resolve_ado_org(),
+        auth_token=resolve_pat_credential(),
+        default_project=default_project,
+    )
 
-    async with Agent(
+    instructions = [
+        "You are an Azure DevOps assistant specialized in Terraform and Azure DevOps workflows.",
+        "Use Azure DevOps MCP tools when they help answer the user.",
+        "Use the create_file_in_repo tool when the user asks to add or update a text file in an Azure DevOps Git repository.",
+        "Ask for missing project, repository, branch, or file path context before making repository changes.",
+    ]
+    if default_project:
+        instructions.append(
+            f"When the user does not specify a project, start with the Azure DevOps project '{default_project}'."
+        )
+    else:
+        instructions.append(
+            "Ask the user for the Azure DevOps project when it is not provided."
+        )
+
+    agent = Agent(
         client=FoundryChatClient(
             project_endpoint=require_env("FOUNDRY_PROJECT_ENDPOINT"),
             model=require_env("FOUNDRY_DEFAULT_MODEL"),
             credential=credential,
         ),
         name="AzureDevOpsAgent",
-        instructions=f"""
-            You are an Azure DevOps assistant.
-            Use Azure DevOps MCP tools when they help answer the user.",
-            Ask for missing project, repository, pull request, or work item context before making changes.",
-            When the user does not specify a project, start with the Azure DevOps project '{get_first_env("ADO_DEFAULT_PROJECT")}'."
-        """,
-        tools=build_ado_mcp_tool(),
-    ) as agent:
-        print("Agent: ", end="", flush=True)
-        stream = agent.run(query, stream=True)
-        chunks: list[str] = []
+        instructions=" ".join(instructions),
+        tools=[build_ado_mcp_tool(), ado_tools.create_file_in_repo],
+    )
 
-        async for chunk in stream:
-            if chunk.text:
-                print(chunk.text, end="", flush=True)
-                chunks.append(chunk.text)
-
-        final_response = await stream.get_final_response()
-
-    final_text = (final_response.text or "".join(chunks)).strip() or str(final_response)
-    if not chunks and final_text:
-        print(final_text, end="", flush=True)
-
-    print()
-    return final_text
-
-
-async def main() -> None:
-    await run_query("List all projects in my Azure DevOps organization.")
+    serve(
+        entities=[agent],
+        port=8090,
+        auto_open=True,
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
