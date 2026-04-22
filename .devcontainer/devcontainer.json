@@ -1,0 +1,51 @@
+{
+    "name": "Dev Container",
+    "image": "mcr.microsoft.com/devcontainers/base:jammy",
+    "containerUser": "vscode",
+    "features": {
+        "azure-cli": {
+            "version": "latest"
+        },
+        "ghcr.io/devcontainers/features/terraform:latest": {
+            "version": "latest",
+            "tflint": "latest"
+        },
+        "ghcr.io/devcontainers/features/python:1.8.0": {
+            "installTools": true,
+            "version": "3.13"
+        },
+        "ghcr.io/va-h/devcontainers-features/uv:1": {},
+        "ghcr.io/devcontainers-extra/features/ruff:2.0.0": {},
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // Azure
+                "ms-vscode.vscode-node-azure-pack",
+                // Terraform
+                "hashicorp.terraform",
+                // Copilot
+                "GitHub.copilot-chat",
+                // Python
+                "ms-python.vscode-pylance",
+                "charliermarsh.ruff",
+                "ms-python.bandit",
+                "ms-python.debugpy"
+            ],
+            "settings": {
+                "python.languageServer": "Pylance",
+                "python.analysis.exclude": [
+                    "**/*.md"
+                ],
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": "explicit"
+                    }
+                }
+            }
+        }
+    },
+    "remoteUser": "vscode"
+}
