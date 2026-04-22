@@ -42,7 +42,8 @@
                 "ms-python.bandit",
                 "ms-python.debugpy",
                 "ms-azuretools.vscode-azurefunctions",
-                 "humao.rest-client"
+                "azurite.azurite",
+                "humao.rest-client"
             ],
             "settings": {
                 "python.languageServer": "Pylance",
