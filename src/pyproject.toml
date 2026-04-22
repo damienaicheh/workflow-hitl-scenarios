@@ -1,7 +1,7 @@
 [project]
-name = "poc6"
+name = "iac-deployment-assistant"
 version = "0.1.0"
-description = "POC 6 – IaC Deployment Assistant with Human-in-the-Loop"
+description = "IaC Deployment Assistant – multi-agent HITL workflow for Azure DevOps"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
