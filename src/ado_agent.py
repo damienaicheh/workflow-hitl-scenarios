@@ -6,10 +6,14 @@ from agent_framework.foundry import FoundryChatClient
 from agent_framework_devui import serve
 from azure.identity import DefaultAzureCredential
 from dotenv import load_dotenv
+
 from tools.azure_devops_tools import AzureDevOpsTools
+from tools.terraform_tools import TerraformTools
 
 load_dotenv(override=False)
 
+
+# ── Environment helpers ──────────────────────────────────────────────
 
 def get_first_env(*names: str) -> str | None:
     for name in names:
@@ -37,8 +41,6 @@ def resolve_pat_credential() -> str:
     raw_pat = get_first_env("ADO_PAT")
     if not raw_pat:
         raise ValueError("PAT auth requires ADO_PAT.")
-
-    # Azure DevOps only uses the PAT portion of username:pat, so any non-empty placeholder works.
     pat_identity = "ado@example.invalid"
     return base64.b64encode(f"{pat_identity}:{raw_pat}".encode("utf-8")).decode("utf-8")
 
@@ -47,7 +49,6 @@ def resolve_ado_domains() -> list[str]:
     raw_domains = get_first_env("ADO_DOMAINS")
     if not raw_domains:
         return []
-
     return [domain.strip() for domain in raw_domains.split(",") if domain.strip()]
 
 
@@ -59,7 +60,6 @@ def build_ado_mcp_tool() -> MCPStdioTool:
         "--authentication",
         "pat",
     ]
-
     for domain in resolve_ado_domains():
         tool_args.extend(["-d", domain])
 
@@ -74,24 +74,32 @@ def build_ado_mcp_tool() -> MCPStdioTool:
     )
 
 
+# ── Main ─────────────────────────────────────────────────────────────
+
 def main():
     credential = DefaultAzureCredential()
     default_project = get_first_env("ADO_DEFAULT_PROJECT")
+
     ado_tools = AzureDevOpsTools(
         organization=resolve_ado_org(),
         auth_token=resolve_pat_credential(),
         default_project=default_project,
     )
+    terraform_tools = TerraformTools()
 
     instructions = [
-        "You are an Azure DevOps assistant specialized in Terraform and Azure DevOps workflows.",
+        "You are an IaC Deployment Assistant for Azure DevOps.",
+        "You can generate Terraform code, validate it, format it, and push it to Azure DevOps repositories.",
         "Use Azure DevOps MCP tools when they help answer the user.",
-        "Use the create_file_in_repo tool when the user asks to add or update a text file in an Azure DevOps Git repository.",
-        "Ask for missing project, repository, branch, or file path context before making repository changes.",
+        "Use create_file_in_repo to add or update files in a repository.",
+        "Use push_terraform_branch to push multiple Terraform files to a new branch.",
+        "Use create_pull_request to create PRs after pushing code.",
+        "Use validate_terraform and format_terraform to check Terraform code before pushing.",
+        "Ask for missing project, repository, branch, or file path context before making changes.",
     ]
     if default_project:
         instructions.append(
-            f"When the user does not specify a project, start with the Azure DevOps project '{default_project}'."
+            f"When the user does not specify a project, use '{default_project}'."
         )
     else:
         instructions.append(
@@ -104,9 +112,16 @@ def main():
             model=require_env("FOUNDRY_DEFAULT_MODEL"),
             credential=credential,
         ),
-        name="AzureDevOpsAgent",
+        name="IaCDeploymentAgent",
         instructions=" ".join(instructions),
-        tools=[build_ado_mcp_tool(), ado_tools.create_file_in_repo],
+        tools=[
+            build_ado_mcp_tool(),
+            ado_tools.create_file_in_repo,
+            ado_tools.push_terraform_branch,
+            ado_tools.create_pull_request,
+            terraform_tools.validate_terraform,
+            terraform_tools.format_terraform,
+        ],
     )
 
     serve(

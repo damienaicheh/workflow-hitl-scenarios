@@ -5,11 +5,8 @@ resource "azurerm_storage_account" "this" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
-  ## Identity configuration
   shared_access_key_enabled = false
-
-  ## Network access configuration
-  min_tls_version = "TLS1_2"
+  min_tls_version           = "TLS1_2"
 
   allow_nested_items_to_be_public = false
 

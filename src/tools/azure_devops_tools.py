@@ -9,6 +9,12 @@ ADO_API_VERSION = "7.1"
 
 
 class AzureDevOpsTools:
+    """Azure DevOps Git operations via REST API (aiohttp).
+
+    Based on Damien Aicheh's implementation with additions for
+    branch creation, multi-file push, and pull request creation.
+    """
+
     def __init__(self, organization: str, auth_token: str, default_project: str | None):
         self.organization = organization
         self.auth_token = auth_token
@@ -75,7 +81,8 @@ class AzureDevOpsTools:
                 if response.status not in expected_statuses:
                     detail = response_text.strip()
                     raise ValueError(
-                        f"Azure DevOps API returned {response.status} for {method} {url}: {detail or 'No response body.'}"
+                        f"Azure DevOps API returned {response.status} for {method} {url}: "
+                        f"{detail or 'No response body.'}"
                     )
 
                 if not response_text.strip():
@@ -97,12 +104,8 @@ class AzureDevOpsTools:
 
         response = await self._request_json(
             "GET",
-            self._build_url(
-                project,
-                f"/_apis/git/repositories/{repository_name}",
-            ),
+            self._build_url(project, f"/_apis/git/repositories/{repository_name}"),
             params={"api-version": ADO_API_VERSION},
-            expected_statuses=(200,),
         )
 
         if not response:
@@ -116,15 +119,11 @@ class AzureDevOpsTools:
         branch_name = self._normalize_branch_name(branch)
         response = await self._request_json(
             "GET",
-            self._build_url(
-                project,
-                f"/_apis/git/repositories/{repository_id}/refs",
-            ),
+            self._build_url(project, f"/_apis/git/repositories/{repository_id}/refs"),
             params={
                 "filter": f"heads/{branch_name}",
                 "api-version": ADO_API_VERSION,
             },
-            expected_statuses=(200,),
         )
 
         refs = response.get("value", []) if response else []
@@ -143,10 +142,7 @@ class AzureDevOpsTools:
         branch_name = self._normalize_branch_name(branch)
         response = await self._request_json(
             "GET",
-            self._build_url(
-                project,
-                f"/_apis/git/repositories/{repository_id}/items",
-            ),
+            self._build_url(project, f"/_apis/git/repositories/{repository_id}/items"),
             params={
                 "path": path,
                 "includeContentMetadata": "true",
@@ -154,10 +150,11 @@ class AzureDevOpsTools:
                 "versionDescriptor.versionType": "branch",
                 "api-version": ADO_API_VERSION,
             },
-            expected_statuses=(200,),
             allow_404=True,
         )
         return response is not None
+
+    # ── Tool: create or update a single file ─────────────────────────
 
     @tool(
         name="create_file_in_repo",
@@ -172,9 +169,7 @@ class AzureDevOpsTools:
         ],
         path: Annotated[
             str,
-            Field(
-                description="Repository path for the file, for example '/docs/plan.md'."
-            ),
+            Field(description="Repository path for the file, for example '/docs/plan.md'."),
         ],
         content: Annotated[
             str,
@@ -182,21 +177,15 @@ class AzureDevOpsTools:
         ],
         project: Annotated[
             str | None,
-            Field(
-                description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
-            ),
+            Field(description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."),
         ] = None,
         branch: Annotated[
             str | None,
-            Field(
-                description="Existing branch name. Uses the repository default branch when omitted."
-            ),
+            Field(description="Existing branch name. Uses the repository default branch when omitted."),
         ] = None,
         commit_message: Annotated[
             str | None,
-            Field(
-                description="Git commit message. A default message is generated when omitted."
-            ),
+            Field(description="Git commit message. A default message is generated when omitted."),
         ] = None,
     ) -> str:
         resolved_project = self._resolve_project(project)
@@ -212,10 +201,7 @@ class AzureDevOpsTools:
             resolved_project, repository_id, branch_name
         )
         file_exists = await self._file_exists(
-            resolved_project,
-            repository_id,
-            normalized_path,
-            branch_name,
+            resolved_project, repository_id, normalized_path, branch_name,
         )
         change_type = "edit" if file_exists else "add"
         comment = commit_message or (
@@ -266,3 +252,161 @@ class AzureDevOpsTools:
             result += f" Commit: {commit_id}."
 
         return result
+
+    # ── Tool: push multiple Terraform files to a new branch ──────────
+
+    @tool(
+        name="push_terraform_branch",
+        description="Create a new branch from the default branch and push multiple Terraform files to it.",
+        approval_mode="never_require",
+    )
+    async def push_terraform_branch(
+        self,
+        repository: Annotated[
+            str,
+            Field(description="Azure DevOps repository name."),
+        ],
+        branch_name: Annotated[
+            str,
+            Field(description="Name of the new branch to create (e.g. 'infra/add-app-service')."),
+        ],
+        terraform_files_json: Annotated[
+            str,
+            Field(description="JSON string: list of objects with 'filename' and 'content' keys."),
+        ],
+        commit_message: Annotated[
+            str,
+            Field(description="Commit message for the push."),
+        ],
+        project: Annotated[
+            str | None,
+            Field(description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."),
+        ] = None,
+    ) -> str:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+        default_branch = self._default_branch_name(repository_info)
+
+        # Get HEAD of the default branch
+        default_ref = await self._resolve_branch_ref(
+            resolved_project, repository_id, default_branch
+        )
+        old_object_id = default_ref["objectId"]
+
+        # Create the new branch
+        await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/refs",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload=[
+                {
+                    "name": f"refs/heads/{branch_name}",
+                    "oldObjectId": "0" * 40,
+                    "newObjectId": old_object_id,
+                }
+            ],
+            expected_statuses=(200, 201),
+        )
+
+        # Build file changes
+        files = json.loads(terraform_files_json)
+        changes = []
+        for f in files:
+            path = f"/infra/{f['filename']}" if not f["filename"].startswith("/") else f["filename"]
+            exists = await self._file_exists(
+                resolved_project, repository_id, path, branch_name
+            )
+            changes.append(
+                {
+                    "changeType": "edit" if exists else "add",
+                    "item": {"path": path},
+                    "newContent": {"content": f["content"], "contentType": "rawtext"},
+                }
+            )
+
+        # Push the commit
+        await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/pushes",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload={
+                "refUpdates": [
+                    {
+                        "name": f"refs/heads/{branch_name}",
+                        "oldObjectId": old_object_id,
+                    }
+                ],
+                "commits": [{"comment": commit_message, "changes": changes}],
+            },
+            expected_statuses=(200, 201),
+        )
+
+        return (
+            f"Branch '{branch_name}' created and {len(files)} file(s) pushed "
+            f"in project '{resolved_project}'."
+        )
+
+    # ── Tool: create a pull request ──────────────────────────────────
+
+    @tool(
+        name="create_pull_request",
+        description="Create a Pull Request in Azure DevOps from a source branch to the default branch.",
+        approval_mode="never_require",
+    )
+    async def create_pull_request(
+        self,
+        repository: Annotated[
+            str,
+            Field(description="Azure DevOps repository name."),
+        ],
+        branch_name: Annotated[
+            str,
+            Field(description="Source branch name."),
+        ],
+        title: Annotated[
+            str,
+            Field(description="PR title."),
+        ],
+        description: Annotated[
+            str,
+            Field(description="PR description in markdown."),
+        ],
+        project: Annotated[
+            str | None,
+            Field(description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."),
+        ] = None,
+    ) -> str:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+        target_branch = self._default_branch_name(repository_info)
+
+        response = await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/pullrequests",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload={
+                "sourceRefName": f"refs/heads/{branch_name}",
+                "targetRefName": f"refs/heads/{target_branch}",
+                "title": title,
+                "description": description,
+            },
+            expected_statuses=(200, 201),
+        )
+
+        pr_id = response["pullRequestId"]
+        web_url = (
+            f"https://dev.azure.com/{self.organization}/{resolved_project}"
+            f"/_git/{repository_info.get('name', repository)}/pullrequest/{pr_id}"
+        )
+        return f"Pull Request #{pr_id} created: {web_url}"

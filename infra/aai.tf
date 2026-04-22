@@ -7,7 +7,6 @@ resource "azurerm_application_insights" "this" {
   tags                = local.tags
 }
 
-
 resource "azapi_resource" "conn_aai" {
   type                      = "Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01"
   name                      = azurerm_application_insights.this.name

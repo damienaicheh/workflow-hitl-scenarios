@@ -8,11 +8,9 @@ resource "azurerm_cosmosdb_account" "this" {
 
   free_tier_enabled = false
 
-  # Set security-related settings
   local_authentication_disabled = true
   public_network_access_enabled = true
 
-  # Set high availability and failover settings
   automatic_failover_enabled       = false
   multiple_write_locations_enabled = false
 

@@ -15,13 +15,11 @@ resource "azapi_resource" "ai_search" {
     }
 
     properties = {
-      # Search-specific properties
       replicaCount   = 1
       partitionCount = 1
       hostingMode    = "Default"
       semanticSearch = "disabled"
 
-      # Identity-related controls
       disableLocalAuth = false
       authOptions = {
         aadOrApiKey = {
@@ -29,7 +27,6 @@ resource "azapi_resource" "ai_search" {
         }
       }
 
-      # Networking-related controls
       publicNetworkAccess = "Enabled"
       networkRuleSet = {
         bypass = "None"

@@ -1,13 +1,13 @@
 variable "domain" {
   description = "Azure deployment domain"
   type        = string
-  default     = "wkf"
+  default     = "poc6"
 }
 
 variable "workload" {
   description = "Azure deployment workload"
   type        = string
-  default     = "hitl"
+  default     = "iac"
 }
 
 variable "environment" {
@@ -23,13 +23,13 @@ variable "environment" {
 variable "location" {
   description = "Azure deployment location"
   type        = string
-  default     = "switzerlandnorth"
+  default     = "swedencentral"
 }
 
 variable "region" {
   description = "Azure deployment region"
   type        = string
-  default     = "sln"
+  default     = "swe"
 }
 
 variable "tags" {

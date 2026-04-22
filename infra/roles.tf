@@ -34,7 +34,7 @@ resource "azurerm_role_assignment" "acr_pull_uai" {
 }
 
 # =============================================================================
-# Role assignments for Cosmos DB SQL data plane
+# Cosmos DB SQL data plane roles
 # These must be assigned AFTER the capability host is created
 # =============================================================================
 
@@ -88,8 +88,7 @@ resource "azurerm_cosmosdb_sql_role_assignment" "cosmosdb_db_sql_role_uai_agent_
 }
 
 # =============================================================================
-# Role assignment for Storage Blob Data Owner with condition
-# This must be assigned AFTER the capability host is created
+# Storage Blob Data Owner with condition (after capability host)
 # =============================================================================
 
 resource "azurerm_role_assignment" "storage_blob_data_owner_uai" {
@@ -116,7 +115,7 @@ resource "azurerm_role_assignment" "storage_blob_data_owner_uai" {
 }
 
 # =============================================================================
-# User deployment role assignments end here
+# User role assignments (for the logged-in user running the agents)
 # =============================================================================
 
 resource "azurerm_role_assignment" "ms_foundry_azure_ai_user_to_user" {
@@ -147,38 +146,4 @@ resource "azurerm_role_assignment" "acr_pull_to_user" {
   scope                = azurerm_container_registry.this.id
   role_definition_name = "AcrPull"
   principal_id         = data.azurerm_client_config.current.object_id
-}
-
-resource "azurerm_role_assignment" "acr_push_to_user" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPush"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
-# =============================================================================
-# Foundry resources role assignments end here
-# =============================================================================
-
-resource "azurerm_role_assignment" "acr_pull_to_ms_foundry" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = azapi_resource.ms_foundry.output.identity.principalId
-}
-
-resource "azurerm_role_assignment" "acr_repository_reader_to_ms_foundry" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "Container Registry Repository Reader"
-  principal_id         = azapi_resource.ms_foundry.output.identity.principalId
-}
-
-resource "azurerm_role_assignment" "acr_pull_to_ms_foundry_project" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "AcrPull"
-  principal_id         = azapi_resource.ms_foundry_project.output.identity.principalId
-}
-
-resource "azurerm_role_assignment" "acr_repository_reader_to_ms_foundry_project" {
-  scope                = azurerm_container_registry.this.id
-  role_definition_name = "Container Registry Repository Reader"
-  principal_id         = azapi_resource.ms_foundry_project.output.identity.principalId
 }

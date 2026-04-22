@@ -18,8 +18,8 @@ resource "azapi_resource" "ms_foundry_project" {
     }
 
     properties = {
-      displayName = "project"
-      description = "A project for the AI Foundry account with network secured deployed Agent using User Assigned Identity"
+      displayName = "poc6-project"
+      description = "AI Foundry project for POC 6 IaC Deployment Assistant"
     }
   }
 

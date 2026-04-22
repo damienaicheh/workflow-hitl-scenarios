@@ -17,7 +17,6 @@ terraform {
   }
 
   backend "local" {}
-  # backend "azurerm" {}
 }
 
 provider "azurerm" {
@@ -30,5 +29,4 @@ provider "azurerm" {
 }
 
 provider "azapi" {
-  # Configuration options
 }
