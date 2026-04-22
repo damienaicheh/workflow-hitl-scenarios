@@ -4,7 +4,7 @@ resource "azapi_resource" "ai_search" {
   parent_id = local.resource_group_id
   location  = local.resource_group_location
   tags      = local.tags_azapi
-  
+
   body = {
     sku = {
       name = "standard"

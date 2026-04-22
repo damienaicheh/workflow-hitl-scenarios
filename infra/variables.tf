@@ -1,13 +1,13 @@
 variable "domain" {
   description = "Azure deployment domain"
   type        = string
-  default     = "agt"
+  default     = "wkf"
 }
 
 variable "workload" {
   description = "Azure deployment workload"
   type        = string
-  default     = "ai"
+  default     = "hitl"
 }
 
 variable "environment" {

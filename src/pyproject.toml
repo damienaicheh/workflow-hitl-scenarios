@@ -1,0 +1,20 @@
+[project]
+name = "src"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "python-dotenv==1.1.1",
+    "agent-framework-core==1.0.1",
+    "agent-framework-devui==1.0.0b260409",
+    "agent-framework-foundry==1.0.1",
+    "agent-framework-orchestrations==1.0.0b260409",
+    "azure-identity==1.25.3",
+    "aiohttp==3.13.5",
+    "azure-ai-projects==2.0.1",
+]
+
+[project.scripts]
+[tool.uv]
+prerelease = "allow"

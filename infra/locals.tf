@@ -22,9 +22,9 @@ locals {
     var.tags,
     tomap(
       {
-        "Environment" = var.environment,
-        "ProjectName" = "ai-scenarios/ms-foundry/private-network",
-        "Domain"      = var.domain,
+        "Environment"     = var.environment,
+        "ProjectName"     = "workflow-hitl-scenarios",
+        "Domain"          = var.domain,
         "SecurityControl" = "Ignore",
         "CostControl"     = "Ignore"
       }
