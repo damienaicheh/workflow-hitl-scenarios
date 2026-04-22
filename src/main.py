@@ -102,7 +102,7 @@ async def process_event_stream(
 async def main() -> None:
     client = FoundryChatClient(
         project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_MODEL"],
+        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
         credential=AzureCliCredential(),
     )
 
