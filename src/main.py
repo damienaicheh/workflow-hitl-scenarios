@@ -1,158 +1,393 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-"""
-Sample: Request Info with SequentialBuilder
+"""IaC Deployment Assistant — multi-agent HITL workflow.
 
-This sample demonstrates using the `.with_request_info()` method to pause a
-SequentialBuilder workflow AFTER each agent runs, allowing external input
-(e.g., human feedback) for review and optional iteration.
+Architecture
+~~~~~~~~~~~~
+Phase 1 — iterative review loop::
 
-Purpose:
-Show how to use the request info API that pauses after every agent response,
-using the standard request_info pattern for consistency.
+    drafter → validator → reviewer  [HITL PAUSE]
+         ↑                           │
+         └── human feedback ←────────┘
 
-Demonstrate:
-- Configuring request info with `.with_request_info()`
-- Handling request_info events with AgentInputRequest data
-- Injecting responses back into the workflow via run(responses=..., stream=True)
+Phase 2 — deployment (runs once after approval)::
 
-Prerequisites:
-- FOUNDRY_PROJECT_ENDPOINT must be your Azure AI Foundry Agent Service (V2) project endpoint.
-- FOUNDRY_MODEL must be set to your Azure OpenAI model deployment name.
-- Authentication via azure-identity (run az login before executing)
+    publisher → notifier → deployer → reporter
+
+Prerequisites
+~~~~~~~~~~~~~
+- ``FOUNDRY_PROJECT_ENDPOINT`` and ``FOUNDRY_DEFAULT_MODEL`` in .env
+- ``ADO_ORG``, ``ADO_PAT`` for Azure DevOps operations
+- ``az login`` for Foundry authentication
 """
 
 import asyncio
-import os
+import logging
 from collections.abc import AsyncIterable
 from typing import cast
 
-from agent_framework import (
-    Agent,
-    AgentExecutorResponse,
-    Message,
-    WorkflowEvent,
-)
-from agent_framework.foundry import FoundryChatClient
+from agent_framework import Agent, AgentExecutorResponse, Message, WorkflowEvent
 from agent_framework.orchestrations import AgentRequestInfoResponse, SequentialBuilder
-from azure.identity import AzureCliCredential
-from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+import config
+from tools.azure_devops_tools import AzureDevOpsTools
+from tools.email_tools import EmailTools
+from tools.pipeline_tools import PipelineTools
+from tools.teams_tools import TeamsTools
+from tools.terraform_tools import TerraformTools
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger("iac-assistant")
+
+MAX_REVIEW_ITERATIONS = 5
+APPROVE_KEYWORDS = frozenset({"approve", "skip", "ok", "yes", "lgtm"})
 
 
-async def process_event_stream(
+# ── Phase 1: Review stream handler ──────────────────────────────────
+
+async def process_review_stream(
     stream: AsyncIterable[WorkflowEvent],
-) -> dict[str, AgentRequestInfoResponse] | None:
-    """Process events from the workflow stream to capture human feedback requests."""
+) -> tuple[bool, str | None, str | None]:
+    """Consume the review workflow stream, pausing for human input.
+
+    Returns ``(approved, feedback_or_none, last_agent_output)``.
+    """
     requests: dict[str, AgentExecutorResponse] = {}
+    last_output: str | None = None
+
     async for event in stream:
         if event.type == "request_info" and isinstance(
             event.data, AgentExecutorResponse
         ):
             requests[event.request_id] = event.data
-
         elif event.type == "output":
-            # The output of the sequential workflow is a list of ChatMessages
-            print("\n" + "=" * 60)
-            print("WORKFLOW COMPLETE")
-            print("=" * 60)
-            print("Final output:")
-            outputs = cast(list[Message], event.data)
-            for message in outputs:
-                print(f"[{message.author_name or message.role}]: {message.text}")
+            for msg in cast(list[Message], event.data):
+                if msg.text:
+                    last_output = msg.text
+
+    if not requests:
+        return True, None, last_output
+
+    for _rid, request in requests.items():
+        agent_text = request.agent_response.text or ""
+
+        log.info("Review ready — presenting to human")
+        print("\n" + "─" * 60)
+        print("  REVIEW: Terraform plan ready for your approval")
+        print("─" * 60)
+        print(agent_text[:2000])
+        print("─" * 60)
+
+        user_input = input(  # noqa: ASYNC250
+            "\nType 'approve' to deploy, or describe changes:\n> "
+        )
+
+        if user_input.strip().lower() in APPROVE_KEYWORDS:
+            return True, None, agent_text
+        return False, user_input.strip(), agent_text
+
+    return True, None, last_output
+
+
+# ── Phase 2: Deploy stream handler ──────────────────────────────────
+
+async def process_deploy_stream(
+    stream: AsyncIterable[WorkflowEvent],
+) -> dict[str, AgentRequestInfoResponse] | None:
+    """Consume the deployment workflow stream, collecting any HITL prompts."""
+    requests: dict[str, AgentExecutorResponse] = {}
+
+    async for event in stream:
+        if event.type == "request_info" and isinstance(
+            event.data, AgentExecutorResponse
+        ):
+            requests[event.request_id] = event.data
+        elif event.type == "output":
+            log.info("Deployment pipeline finished")
+            print("\n" + "═" * 60)
+            print("  DEPLOYMENT COMPLETE")
+            print("═" * 60)
+            for msg in cast(list[Message], event.data):
+                if msg.text:
+                    print(f"  [{msg.author_name or msg.role}]  {msg.text}")
+
+    if not requests:
+        return None
 
     responses: dict[str, AgentRequestInfoResponse] = {}
-    if requests:
-        for request_id, request in requests.items():
-            # Display agent response and conversation context for review
-            print("\n" + "-" * 40)
-            print("REQUEST INFO: INPUT REQUESTED")
-            print(
-                f"Agent {request.executor_id} just responded with: '{request.agent_response.text}'. "
-                "Please provide your feedback."
+    for request_id, request in requests.items():
+        print(f"\n  Agent '{request.executor_id}' requests input:")
+        print(f"  {request.agent_response.text[:500]}")
+        user_input = input("  Your decision (or 'approve'): ")  # noqa: ASYNC250
+
+        if user_input.strip().lower() in APPROVE_KEYWORDS:
+            responses[request_id] = AgentRequestInfoResponse.approve()
+        else:
+            responses[request_id] = AgentRequestInfoResponse.from_strings(
+                [user_input]
             )
-            print("-" * 40)
-            if request.full_conversation:
-                print("Conversation context:")
-                recent = (
-                    request.full_conversation[-2:]
-                    if len(request.full_conversation) > 2
-                    else request.full_conversation
-                )
-                for msg in recent:
-                    name = msg.author_name or msg.role
-                    text = (msg.text or "")[:150]
-                    print(f"  [{name}]: {text}...")
-                print("-" * 40)
+    return responses
 
-            # Get feedback on the agent's response (approve or request iteration)
-            user_input = input("Your guidance (or 'skip' to approve): ")  # noqa: ASYNC250
-            if user_input.lower() == "skip":
-                user_input = AgentRequestInfoResponse.approve()
-            else:
-                user_input = AgentRequestInfoResponse.from_strings([user_input])
 
-            responses[request_id] = user_input
+# ── Agent definitions ────────────────────────────────────────────────
 
-    return responses if responses else None
+
+def _build_agents(
+    llm: object,
+    orchestrator_llm: object,
+    ado_tools: AzureDevOpsTools,
+    terraform_tools: TerraformTools,
+    pipeline_tools: PipelineTools,
+    teams_tools: TeamsTools | None,
+    email_tools: EmailTools | None = None,
+) -> dict[str, Agent]:
+    """Construct all agents once, return them keyed by name."""
+
+    repo = config.ado_repo()
+
+    agents: dict[str, Agent] = {}
+
+    # Phase 1 ─────────────────────────────────────────────────────
+
+    agents["drafter"] = Agent(
+        client=orchestrator_llm,
+        name="drafter",
+        instructions=(
+            "You are a Terraform expert. Given a user request for Azure "
+            "infrastructure, generate the necessary .tf files. Output them as "
+            'a JSON list: [{"filename": "main.tf", "content": "..."}, ...]. '
+            "Follow Azure best practices and use azurerm provider. "
+            "If previous feedback is provided, incorporate ALL of it."
+        ),
+    )
+
+    agents["validator"] = Agent(
+        client=llm,
+        name="validator",
+        instructions=(
+            "You are an IaC validator. Run validate_terraform and "
+            "format_terraform on the Terraform files from the drafter. "
+            "If validation fails, describe the errors. "
+            "If it passes, output the formatted files as the same JSON list."
+        ),
+        tools=[
+            terraform_tools.validate_terraform,
+            terraform_tools.format_terraform,
+        ],
+    )
+
+    agents["reviewer"] = Agent(
+        client=llm,
+        name="reviewer",
+        instructions=(
+            "You are a Terraform reviewer. Present the validated Terraform "
+            "configuration in a clear summary:\n"
+            "1. List each resource (type, name, key settings)\n"
+            "2. Highlight region, SKU/tier, and cost-relevant choices\n"
+            "3. Flag potential issues or recommendations\n"
+            "End with: 'Please approve or provide feedback for changes.'"
+        ),
+    )
+
+    # Phase 2 ─────────────────────────────────────────────────────
+
+    agents["publisher"] = Agent(
+        client=llm,
+        name="publisher",
+        instructions=(
+            "You are a Git operations specialist. Push the validated Terraform "
+            f"files to the repository '{repo}' using push_terraform_branch. "
+            "Use the repository name exactly as given. "
+            "Then create a Pull Request using create_pull_request. "
+            "Output the PR URL."
+        ),
+        tools=[
+            config.build_mcp_tool(),
+            ado_tools.push_terraform_branch,
+            ado_tools.create_pull_request,
+        ],
+    )
+
+    notifier_tools: list = []
+    notifier_parts = [
+        "You are a notification agent. Summarize the deployment plan "
+        "and the PR that was created.",
+    ]
+    if teams_tools:
+        notifier_tools.append(teams_tools.send_teams_approval_card)
+        notifier_parts.append(
+            "Send an Adaptive Card to Teams with the summary and PR link."
+        )
+    notifier_parts.append("Output a clear summary of what was published.")
+
+    agents["notifier"] = Agent(
+        client=llm,
+        name="notifier",
+        instructions=" ".join(notifier_parts),
+        tools=notifier_tools,
+    )
+
+    agents["deployer"] = Agent(
+        client=llm,
+        name="deployer",
+        instructions=(
+            "You are a deployment monitor. Check the pipeline status using "
+            "get_pipeline_runs. Report whether deployment succeeded or failed."
+        ),
+        tools=[
+            pipeline_tools.get_pipeline_runs,
+            pipeline_tools.get_pipeline_run_status,
+        ],
+    )
+
+    reporter_tools: list = []
+    reporter_parts = [
+        "You are a final reporter. Summarize the entire workflow: "
+        "what was generated, validated, reviewed, pushed, and deployed.",
+    ]
+    if teams_tools:
+        reporter_tools.append(teams_tools.send_teams_status_card)
+        reporter_parts.append("Send a final status card to Teams.")
+    if email_tools:
+        reporter_tools.append(email_tools.send_deployment_email)
+        reporter_parts.append("Send a deployment summary email.")
+
+    agents["reporter"] = Agent(
+        client=llm,
+        name="reporter",
+        instructions=" ".join(reporter_parts),
+        tools=reporter_tools,
+    )
+
+    return agents
+
+
+# ── Main ─────────────────────────────────────────────────────────────
 
 
 async def main() -> None:
-    client = FoundryChatClient(
-        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
-        credential=AzureCliCredential(),
+    credential = config.foundry_credential()
+    llm = config.default_client(credential)
+    orchestrator_llm = config.orchestrator_client(credential)
+
+    ado_tools = AzureDevOpsTools(
+        organization=config.ado_org(),
+        auth_token=config.ado_pat_b64(),
+        default_project=config.ado_project(),
+    )
+    terraform_tools = TerraformTools()
+    pipeline_tools = PipelineTools(
+        organization=config.ado_org(),
+        auth_token=config.ado_pat_b64(),
+        default_project=config.ado_project(),
     )
 
-    # Create agents for a sequential document review workflow
-    drafter = Agent(
-        client=client,
-        name="drafter",
-        instructions=(
-            "You are a document drafter. When given a topic, create a brief draft (2-3 sentences)."
-        ),
+    webhook = config.get_env("TEAMS_WEBHOOK_URL")
+    teams_tools = TeamsTools(webhook_url=webhook) if webhook else None
+
+    acs_conn = config.get_env("ACS_CONNECTION_STRING")
+    acs_sender = config.get_env("ACS_SENDER_EMAIL")
+    email_tools = (
+        EmailTools(connection_string=acs_conn, sender_email=acs_sender)
+        if acs_conn and acs_sender
+        else None
     )
 
-    editor = Agent(
-        client=client,
-        name="editor",
-        instructions=(
-            "You are an editor. Review the draft and make improvements. "
-            "Incorporate any human feedback that was provided."
-        ),
+    agents = _build_agents(
+        llm, orchestrator_llm, ado_tools, terraform_tools, pipeline_tools,
+        teams_tools, email_tools,
     )
 
-    finalizer = Agent(
-        client=client,
-        name="finalizer",
-        instructions=(
-            "You are a finalizer. Take the edited content and create a polished final version. "
-            "Incorporate any additional feedback provided."
-        ),
-    )
+    # ── Prompt ────────────────────────────────────────────────────
 
-    # Build workflow with request info enabled (pauses after each agent responds)
-    workflow = (
-        SequentialBuilder(participants=[drafter, editor, finalizer])
-        # Only enable request info for the editor agent
-        .with_request_info(agents=["editor"])
+    print("═" * 60)
+    print("  IaC Deployment Assistant")
+    print("═" * 60)
+    user_request = input("Describe the Azure infrastructure you need:\n> ")
+
+    # ── Phase 1: iterative review loop ────────────────────────────
+
+    feedback_history: list[str] = []
+    approved_terraform: str | None = None
+
+    for iteration in range(1, MAX_REVIEW_ITERATIONS + 1):
+        log.info("Review iteration %d/%d", iteration, MAX_REVIEW_ITERATIONS)
+        print(f"\n{'─'*60}")
+        print(f"  ITERATION {iteration}/{MAX_REVIEW_ITERATIONS}")
+        print("─" * 60)
+
+        if feedback_history:
+            feedback_block = "\n".join(
+                f"  {i}. {fb}" for i, fb in enumerate(feedback_history, 1)
+            )
+            prompt = (
+                f"{user_request}\n\n"
+                f"IMPORTANT — incorporate these changes:\n{feedback_block}\n\n"
+                f"Regenerate the Terraform files with ALL feedback above."
+            )
+        else:
+            prompt = user_request
+
+        review_wf = (
+            SequentialBuilder(
+                participants=[agents["drafter"], agents["validator"], agents["reviewer"]],
+            )
+            .with_request_info(agents=["reviewer"])
+            .build()
+        )
+
+        stream = review_wf.run(prompt, stream=True)
+        approved, feedback, terraform_output = await process_review_stream(stream)
+
+        if approved:
+            approved_terraform = terraform_output
+            log.info("Terraform approved after %d iteration(s)", iteration)
+            print("\n  ✓ Terraform approved!")
+            break
+
+        feedback_history.append(feedback)
+        log.info("Feedback #%d: %s", iteration, feedback)
+        print(f"\n  ✗ Feedback recorded — re-drafting…")
+
+    if not approved_terraform:
+        log.warning("Not approved after %d iterations", MAX_REVIEW_ITERATIONS)
+        print(f"\n  ✗ Not approved after {MAX_REVIEW_ITERATIONS} iterations. Exiting.")
+        return
+
+    # ── Phase 2: deployment ───────────────────────────────────────
+
+    log.info("Starting deployment phase")
+    print(f"\n{'═'*60}")
+    print("  PHASE 2: DEPLOYMENT")
+    print("═" * 60)
+
+    deploy_wf = (
+        SequentialBuilder(
+            participants=[
+                agents["publisher"],
+                agents["notifier"],
+                agents["deployer"],
+                agents["reporter"],
+            ],
+        )
         .build()
     )
 
-    # Initiate the first run of the workflow.
-    # Runs are not isolated; state is preserved across multiple calls to run.
-    stream = workflow.run(
-        "Write a brief introduction to artificial intelligence.", stream=True
+    deploy_prompt = (
+        f"The following Terraform has been reviewed and approved.\n\n"
+        f"Original request: {user_request}\n\n"
+        f"Approved Terraform:\n{approved_terraform}"
     )
 
-    pending_responses = await process_event_stream(stream)
-    while pending_responses is not None:
-        # Run the workflow until there is no more human feedback to provide,
-        # in which case this workflow completes.
-        stream = workflow.run(stream=True, responses=pending_responses)
-        pending_responses = await process_event_stream(stream)
+    stream = deploy_wf.run(deploy_prompt, stream=True)
+    pending = await process_deploy_stream(stream)
+    while pending is not None:
+        stream = deploy_wf.run(stream=True, responses=pending)
+        pending = await process_deploy_stream(stream)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 [project]
-name = "src"
+name = "iac-deployment-assistant"
 version = "0.1.0"
-description = "Add your description here"
+description = "IaC Deployment Assistant – multi-agent HITL workflow for Azure DevOps"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -14,6 +14,7 @@ dependencies = [
     "aiohttp==3.13.5",
     "azure-ai-projects==2.0.1",
     "mcp>=1.27.0",
+    "azure-communication-email>=1.0.0",
 ]
 
 [project.scripts]
