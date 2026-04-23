@@ -44,16 +44,30 @@ incorporating **all** accumulated feedback — not just the latest.
 
 ```
 src/
-├── config.py          # Shared configuration (env, clients, MCP)
-├── main.py            # Console HITL workflow (two-phase)
-├── ado_agent.py       # DevUI single-agent on port 8090
+├── config.py                   # Shared configuration (env, clients, MCP, prompt loader)
+├── main.py                     # Console HITL workflow (two-phase)
+├── ado_agent.py                # DevUI single-agent on port 8090
 ├── pyproject.toml
-└── tools/
-    ├── azure_devops_tools.py   # Git push, PR creation
-    ├── terraform_tools.py      # validate / fmt via CLI
-    ├── pipeline_tools.py       # ADO pipeline monitoring
-    ├── teams_tools.py          # Adaptive Cards via webhook
-    └── email_tools.py          # Email via Azure Comm Services
+├── prompts/                    # Externalized agent instructions
+│   ├── drafter.txt
+│   ├── validator.txt
+│   ├── reviewer.txt
+│   ├── publisher.txt
+│   ├── notifier.txt
+│   ├── deployer.txt
+│   ├── reporter.txt
+│   └── ado_agent.txt
+├── tools/
+│   ├── azure_devops_tools.py   # Git push, PR creation
+│   ├── terraform_tools.py      # validate / fmt via CLI
+│   ├── pipeline_tools.py       # ADO pipeline monitoring
+│   ├── teams_tools.py          # Adaptive Cards via webhook
+│   └── email_tools.py          # Email via Azure Comm Services
+└── func_workflow_hitl/          # Azure Function serverless HITL
+    ├── function_app.py          # AgentFunctionApp (uses config.py)
+    ├── executors/               # WorkflowBuilder executors
+    ├── models/                  # HITL request/response dataclasses
+    └── utils/                   # Response extraction helpers
 ```
 
 ## Setup

@@ -1,5 +1,5 @@
 import logging
-import os
+import sys
 from pathlib import Path
 
 from agent_framework import (
@@ -7,49 +7,39 @@ from agent_framework import (
     Workflow,
     WorkflowBuilder,
 )
-from agent_framework.foundry import FoundryChatClient
 from agent_framework_azurefunctions import AgentFunctionApp
-from azure.identity import AzureCliCredential
-from dotenv import load_dotenv
 from executors.drafter_executor import DrafterExecutor
 from executors.editor_executor import EditorExecutor
 from executors.finalizer_executor import FinalizerExecutor
 from executors.input_router_executor import InputRouterExecutor
 
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+# Make the parent `src/` importable so we can reuse config.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import config  # noqa: E402
 
 
 def create_workflow() -> Workflow:
-    client = FoundryChatClient(
-        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
-        credential=AzureCliCredential(),
-    )
+    client = config.default_client()
 
-    # Create agents for a sequential document review workflow
+    # Create agents for a sequential IaC review workflow
     drafter = Agent(
         client=client,
         name="drafter",
-        instructions=(
-            "You are a document drafter. When given a topic, create a brief draft (2-3 sentences)."
-        ),
+        instructions=config.load_prompt("drafter"),
     )
 
     editor = Agent(
         client=client,
         name="editor",
-        instructions=(
-            "You are an editor. Review the draft and make improvements. "
-            "Incorporate any human feedback that was provided."
-        ),
+        instructions=config.load_prompt("reviewer"),
     )
 
     finalizer = Agent(
         client=client,
         name="finalizer",
         instructions=(
-            "You are a finalizer. Take the edited content and create a polished final version. "
+            "You are a finalizer. Take the reviewed Terraform configuration "
+            "and produce a polished final version ready for deployment. "
             "Incorporate any additional feedback provided."
         ),
     )

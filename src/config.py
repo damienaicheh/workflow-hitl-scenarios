@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+from pathlib import Path
 
 from agent_framework import MCPStdioTool
 from agent_framework.foundry import FoundryChatClient
@@ -93,6 +94,20 @@ def build_mcp_tool() -> MCPStdioTool:
 
 
 # ── Foundry clients ─────────────────────────────────────────────────
+
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name: str, **kwargs: str) -> str:
+    """Load an agent instruction file from ``src/prompts/<name>.txt``.
+
+    Optional *kwargs* are substituted via ``str.format_map``.
+    """
+    path = (_PROMPTS_DIR / f"{name}.txt").resolve()
+    if not path.is_relative_to(_PROMPTS_DIR):
+        raise ValueError(f"Invalid prompt name: {name}")
+    text = path.read_text(encoding="utf-8").strip()
+    return text.format_map(kwargs) if kwargs else text
 
 
 def foundry_credential() -> AzureCliCredential:

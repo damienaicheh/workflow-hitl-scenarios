@@ -154,24 +154,13 @@ def _build_agents(
     agents["drafter"] = Agent(
         client=orchestrator_llm,
         name="drafter",
-        instructions=(
-            "You are a Terraform expert. Given a user request for Azure "
-            "infrastructure, generate the necessary .tf files. Output them as "
-            'a JSON list: [{"filename": "main.tf", "content": "..."}, ...]. '
-            "Follow Azure best practices and use azurerm provider. "
-            "If previous feedback is provided, incorporate ALL of it."
-        ),
+        instructions=config.load_prompt("drafter"),
     )
 
     agents["validator"] = Agent(
         client=llm,
         name="validator",
-        instructions=(
-            "You are an IaC validator. Run validate_terraform and "
-            "format_terraform on the Terraform files from the drafter. "
-            "If validation fails, describe the errors. "
-            "If it passes, output the formatted files as the same JSON list."
-        ),
+        instructions=config.load_prompt("validator"),
         tools=[
             terraform_tools.validate_terraform,
             terraform_tools.format_terraform,
@@ -181,14 +170,7 @@ def _build_agents(
     agents["reviewer"] = Agent(
         client=llm,
         name="reviewer",
-        instructions=(
-            "You are a Terraform reviewer. Present the validated Terraform "
-            "configuration in a clear summary:\n"
-            "1. List each resource (type, name, key settings)\n"
-            "2. Highlight region, SKU/tier, and cost-relevant choices\n"
-            "3. Flag potential issues or recommendations\n"
-            "End with: 'Please approve or provide feedback for changes.'"
-        ),
+        instructions=config.load_prompt("reviewer"),
     )
 
     # Phase 2 ─────────────────────────────────────────────────────
@@ -196,13 +178,7 @@ def _build_agents(
     agents["publisher"] = Agent(
         client=llm,
         name="publisher",
-        instructions=(
-            "You are a Git operations specialist. Push the validated Terraform "
-            f"files to the repository '{repo}' using push_terraform_branch. "
-            "Use the repository name exactly as given. "
-            "Then create a Pull Request using create_pull_request. "
-            "Output the PR URL."
-        ),
+        instructions=config.load_prompt("publisher", repo=repo),
         tools=[
             config.build_mcp_tool(),
             ado_tools.push_terraform_branch,
@@ -211,31 +187,21 @@ def _build_agents(
     )
 
     notifier_tools: list = []
-    notifier_parts = [
-        "You are a notification agent. Summarize the deployment plan "
-        "and the PR that was created.",
-    ]
+    notifier_instructions = config.load_prompt("notifier")
     if teams_tools:
         notifier_tools.append(teams_tools.send_teams_approval_card)
-        notifier_parts.append(
-            "Send an Adaptive Card to Teams with the summary and PR link."
-        )
-    notifier_parts.append("Output a clear summary of what was published.")
 
     agents["notifier"] = Agent(
         client=llm,
         name="notifier",
-        instructions=" ".join(notifier_parts),
+        instructions=notifier_instructions,
         tools=notifier_tools,
     )
 
     agents["deployer"] = Agent(
         client=llm,
         name="deployer",
-        instructions=(
-            "You are a deployment monitor. Check the pipeline status using "
-            "get_pipeline_runs. Report whether deployment succeeded or failed."
-        ),
+        instructions=config.load_prompt("deployer"),
         tools=[
             pipeline_tools.get_pipeline_runs,
             pipeline_tools.get_pipeline_run_status,
@@ -243,18 +209,13 @@ def _build_agents(
     )
 
     reporter_tools: list = []
-    reporter_parts = [
-        "You are a final reporter. Summarize the entire workflow: "
-        "what was generated, validated, reviewed, pushed, and deployed.",
-    ]
     if teams_tools:
         reporter_tools.append(teams_tools.send_teams_status_card)
-        reporter_parts.append("Send a final status card to Teams.")
 
     agents["reporter"] = Agent(
         client=llm,
         name="reporter",
-        instructions=" ".join(reporter_parts),
+        instructions=config.load_prompt("reporter"),
         tools=reporter_tools,
     )
 

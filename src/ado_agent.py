@@ -24,25 +24,18 @@ def main() -> None:
     )
     terraform_tools = TerraformTools()
 
-    instructions = [
-        "You are an IaC Deployment Assistant for Azure DevOps.",
-        "You can generate, validate, format, and push Terraform code.",
-        "Use Azure DevOps MCP tools when they help answer the user.",
-        "Use push_terraform_branch to push files to a new branch.",
-        "Use create_pull_request to create PRs after pushing code.",
-        "Use validate_terraform and format_terraform before pushing.",
-    ]
+    instructions = config.load_prompt("ado_agent")
 
     project = config.ado_project()
     if project:
-        instructions.append(f"Default project: '{project}'.")
+        instructions += f" Default project: '{project}'."
     else:
-        instructions.append("Ask the user for the project when needed.")
+        instructions += " Ask the user for the project when needed."
 
     agent = Agent(
         client=config.default_client(credential),
         name="IaCDeploymentAgent",
-        instructions=" ".join(instructions),
+        instructions=instructions,
         tools=[
             config.build_mcp_tool(),
             ado_tools.create_file_in_repo,
