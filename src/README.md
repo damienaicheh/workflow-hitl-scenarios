@@ -10,7 +10,7 @@ Azure DevOps.
                   ┌──────────────────────────────────────┐
                   │  Phase 1 — iterative review loop     │
                   │                                      │
-   User request ──▶  drafter ─▶ validator ─▶ reviewer    │
+   User request ──▶  drafter ─▶ validator ─▶ reviewer  │
                   │     ▲                       │        │
                   │     └── human feedback ◀────┘        │
                   └──────────────┬───────────────────────┘
@@ -18,7 +18,7 @@ Azure DevOps.
                   ┌──────────────▼───────────────────────┐
                   │  Phase 2 — deployment (runs once)    │
                   │                                      │
-                  │  publisher ─▶ notifier ─▶ deployer   │
+                  │  publisher ─▶ notifier ─▶ deployer  │
                   │                             │        │
                   │                          reporter    │
                   └──────────────────────────────────────┘

@@ -1,72 +1,77 @@
 ### ============================================================================
-### Workflow HITL Sample - Content Moderation with Human Approval
+### IaC Deployment Assistant — HITL Workflow on Azure Durable Functions
 ### ============================================================================
-### This sample demonstrates MAF workflows with human-in-the-loop using the
-### request_info / @response_handler pattern on Azure Durable Functions.
+### Pipeline: input_router → drafter → reviewer (HITL pause) → publisher
 ###
-### The AgentFunctionApp automatically provides all HITL endpoints.
+### The reviewer executor validates the Terraform, summarizes it, and pauses
+### for human approval. On rejection, the drafter re-generates incorporating
+### feedback. On approval, the publisher pushes to ADO and creates a PR.
 ###
 ### Prerequisites:
 ### 1. Start Azurite: azurite --silent --location .
 ### 2. Start Durable Task Scheduler emulator
-### 3. Configure local.settings.json with Azure OpenAI credentials
-### 4. Run: func start
+### 3. Configure local.settings.json (copy from local.settings.json.template)
+### 4. az login
+### 5. Run: func start
 ### ============================================================================
 
 
-### Start the full workflow.
-### This route now runs a custom executor pipeline:
-### input_router -> drafter -> editor (HITL pause) -> finalizer
-
-POST http://localhost:7071/api/workflow/run
-Content-Type: application/json
-
-"Write a brief introduction to artificial intelligence."
-
-### You can also send a structured JSON body; the input router will convert it to a prompt.
+### 1. Start a new IaC workflow.
 
 POST http://localhost:7071/api/workflow/run
 Content-Type: application/json
 
 {
-  "title": "Introduction to artificial intelligence",
-  "body": "Artificial intelligence helps systems reason over data, automate repetitive work, and support human decision-making.",
+  "service": "App Service",
+  "region": "westeurope",
+  "options": "Linux plan, Standard S1 tier, with Application Insights"
+}
+
+### Another example — Storage Account with CDN.
+
+POST http://localhost:7071/api/workflow/run
+Content-Type: application/json
+
+{
+  "service": "Storage Account",
+  "region": "francecentral",
+  "options": "Blob containers for media and backups, plus a CDN endpoint"
 }
 
 ### ============================================================================
+### 2. Check Workflow Status
+### ============================================================================
 
-
-@instanceId = 28b43898e9614cab85205e25e98a992f
+@instanceId = <PASTE_INSTANCE_ID_HERE>
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
 ### ============================================================================
+### 3. Approve the Terraform Review
+### ============================================================================
 
-
-@requestId = cf83544a-2f26-4777-9b2a-de8fd6d551d6
+@requestId = <PASTE_REQUEST_ID_HERE>
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
 
 {
   "approved": true,
-  "feedback": "Looks good."
+  "feedback": "Looks good, deploy it."
 }
 
-
 ### ============================================================================
-### 5. Reject And Ask For Another Editor Pass
+### 4. Reject and Request Changes
 ### ============================================================================
-### This keeps the workflow paused on editor until the revision is acceptable.
+### The reviewer will re-draft incorporating your feedback.
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
 
 {
   "approved": false,
-  "feedback": "Please make the draft shorter and more executive in tone."
+  "feedback": "Use Premium v3 plan instead of Standard S1, and add a custom domain."
 }
-
 
 ### ============================================================================
 ### Health Check

@@ -9,11 +9,7 @@ ADO_API_VERSION = "7.1"
 
 
 class AzureDevOpsTools:
-    """Azure DevOps Git operations via REST API (aiohttp).
-
-    Based on Damien Aicheh's implementation with additions for
-    branch creation, multi-file push, and pull request creation.
-    """
+    """Azure DevOps Git operations via REST API (aiohttp)."""
 
     def __init__(self, organization: str, auth_token: str, default_project: str | None):
         self.organization = organization
@@ -404,7 +400,10 @@ class AzureDevOpsTools:
             expected_statuses=(200, 201),
         )
 
-        pr_id = response["pullRequestId"]
+        pr_id = response.get("pullRequestId") if response else None
+        if not pr_id:
+            return "Pull Request created but ID could not be determined from API response."
+
         web_url = (
             f"https://dev.azure.com/{self.organization}/{resolved_project}"
             f"/_git/{repository_info.get('name', repository)}/pullrequest/{pr_id}"

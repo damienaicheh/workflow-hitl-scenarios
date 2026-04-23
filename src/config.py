@@ -1,11 +1,4 @@
-# Copyright (c) Microsoft. All rights reserved.
-
-"""Shared configuration for the IaC Deployment Assistant.
-
-Centralizes environment resolution, credential handling, and client
-factories so that both the console workflow (main.py) and the DevUI
-agent (ado_agent.py) share the same setup logic.
-"""
+"""Shared configuration for the IaC Deployment Assistant."""
 
 from __future__ import annotations
 

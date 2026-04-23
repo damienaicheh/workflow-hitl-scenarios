@@ -2,6 +2,8 @@ from dataclasses import dataclass
 
 
 @dataclass
-class EditorApprovalResponse:
+class ReviewerApprovalResponse:
+    """Human response: approve or reject with feedback."""
+
     approved: bool
     feedback: str | None = None

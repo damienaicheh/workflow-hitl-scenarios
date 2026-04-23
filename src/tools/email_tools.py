@@ -42,6 +42,12 @@ class EmailTools:
                 "html": body_html,
             },
         }
-        poller = self.client.begin_send(message)
-        result = poller.result()
-        return f"Email sent (id={result['id']}, status={result['status']})."
+        try:
+            poller = self.client.begin_send(message)
+            result = poller.result()
+        except Exception as exc:
+            return f"Failed to send email: {exc}"
+
+        msg_id = result.get("id", "unknown") if isinstance(result, dict) else "unknown"
+        status = result.get("status", "unknown") if isinstance(result, dict) else "unknown"
+        return f"Email sent (id={msg_id}, status={status})."

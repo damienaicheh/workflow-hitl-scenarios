@@ -1,25 +1,4 @@
-# Copyright (c) Microsoft. All rights reserved.
-
-"""IaC Deployment Assistant — multi-agent HITL workflow.
-
-Architecture
-~~~~~~~~~~~~
-Phase 1 — iterative review loop::
-
-    drafter → validator → reviewer  [HITL PAUSE]
-         ↑                           │
-         └── human feedback ←────────┘
-
-Phase 2 — deployment (runs once after approval)::
-
-    publisher → notifier → deployer → reporter
-
-Prerequisites
-~~~~~~~~~~~~~
-- ``FOUNDRY_PROJECT_ENDPOINT`` and ``FOUNDRY_DEFAULT_MODEL`` in .env
-- ``ADO_ORG``, ``ADO_PAT`` for Azure DevOps operations
-- ``az login`` for Foundry authentication
-"""
+"""IaC Deployment Assistant — multi-agent HITL workflow."""
 
 import asyncio
 import logging
