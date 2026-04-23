@@ -404,7 +404,9 @@ class AzureDevOpsTools:
             expected_statuses=(200, 201),
         )
 
-        pr_id = response["pullRequestId"]
+        pr_id = response.get("pullRequestId") if response else None
+        if not pr_id:
+            return "Pull Request creation returned an unexpected response."
         web_url = (
             f"https://dev.azure.com/{self.organization}/{resolved_project}"
             f"/_git/{repository_info.get('name', repository)}/pullrequest/{pr_id}"

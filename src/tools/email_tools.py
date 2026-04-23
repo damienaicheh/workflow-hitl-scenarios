@@ -42,6 +42,9 @@ class EmailTools:
                 "html": body_html,
             },
         }
-        poller = self.client.begin_send(message)
-        result = poller.result()
-        return f"Email sent (id={result['id']}, status={result['status']})."
+        try:
+            poller = self.client.begin_send(message)
+            result = poller.result()
+        except Exception as exc:
+            return f"Failed to send email: {exc}"
+        return f"Email sent (id={result.get('id', '?')}, status={result.get('status', '?')})."

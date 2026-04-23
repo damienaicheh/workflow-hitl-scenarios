@@ -30,8 +30,15 @@ class TerraformTools:
     ) -> str:
         files = json.loads(terraform_files_json)
         with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir).resolve()
             for f in files:
-                filepath = Path(tmpdir) / f["filename"]
+                filepath = (tmpdir_path / f["filename"]).resolve()
+                if not filepath.is_relative_to(tmpdir_path):
+                    return json.dumps({
+                        "valid": False,
+                        "errors": [f"Invalid filename: {f['filename']}"],
+                        "warnings": [],
+                    })
                 filepath.write_text(f["content"], encoding="utf-8")
 
             # terraform init (minimal, no backend)
@@ -101,21 +108,26 @@ class TerraformTools:
     ) -> str:
         files = json.loads(terraform_files_json)
         with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir).resolve()
             for f in files:
-                filepath = Path(tmpdir) / f["filename"]
+                filepath = (tmpdir_path / f["filename"]).resolve()
+                if not filepath.is_relative_to(tmpdir_path):
+                    return json.dumps([{"error": f"Invalid filename: {f['filename']}"}])
                 filepath.write_text(f["content"], encoding="utf-8")
 
-            subprocess.run(
+            result = subprocess.run(
                 ["terraform", "fmt", "-no-color"],
                 cwd=tmpdir,
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
+            if result.returncode != 0:
+                return json.dumps([{"error": f"terraform fmt failed: {result.stderr.strip()}"}])
 
             formatted = []
             for f in files:
-                filepath = Path(tmpdir) / f["filename"]
+                filepath = (tmpdir_path / f["filename"]).resolve()
                 formatted.append({
                     "filename": f["filename"],
                     "content": filepath.read_text(encoding="utf-8"),
