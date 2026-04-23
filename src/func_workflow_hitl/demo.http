@@ -30,20 +30,20 @@ Content-Type: application/json
 
 {
   "title": "Introduction to artificial intelligence",
-  "body": "Artificial intelligence helps systems reason over data, automate repetitive work, and support human decision-making.",
+  "body": "Artificial intelligence helps systems reason over data, automate repetitive work, and support human decision-making."
 }
 
 ### ============================================================================
 
 
-@instanceId = 28b43898e9614cab85205e25e98a992f
+@instanceId = 20bd4081a1aa4cad9c4eea45e6452fb5
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
 ### ============================================================================
 
 
-@requestId = cf83544a-2f26-4777-9b2a-de8fd6d551d6
+@requestId = bcc3cd81-8355-48cb-9bf8-608877a8d5e5
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
