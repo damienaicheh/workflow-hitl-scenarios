@@ -1,0 +1,75 @@
+### ============================================================================
+### Workflow HITL Sample - Content Moderation with Human Approval
+### ============================================================================
+### This sample demonstrates MAF workflows with human-in-the-loop using the
+### request_info / @response_handler pattern on Azure Durable Functions.
+###
+### The AgentFunctionApp automatically provides all HITL endpoints.
+###
+### Prerequisites:
+### 1. Start Azurite: azurite --silent --location .
+### 2. Start Durable Task Scheduler emulator
+### 3. Configure local.settings.json with Azure OpenAI credentials
+### 4. Run: func start
+### ============================================================================
+
+
+### Start the full workflow.
+### This route now runs a custom executor pipeline:
+### input_router -> drafter -> editor (HITL pause) -> finalizer
+
+POST http://localhost:7071/api/workflow/run
+Content-Type: application/json
+
+"Write a brief introduction to artificial intelligence."
+
+### You can also send a structured JSON body; the input router will convert it to a prompt.
+
+POST http://localhost:7071/api/workflow/run
+Content-Type: application/json
+
+{
+  "title": "Introduction to artificial intelligence",
+  "body": "Artificial intelligence helps systems reason over data, automate repetitive work, and support human decision-making.",
+}
+
+### ============================================================================
+
+
+@instanceId = 28b43898e9614cab85205e25e98a992f
+
+GET http://localhost:7071/api/workflow/status/{{instanceId}}
+
+### ============================================================================
+
+
+@requestId = cf83544a-2f26-4777-9b2a-de8fd6d551d6
+
+POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
+Content-Type: application/json
+
+{
+  "approved": true,
+  "feedback": "Looks good."
+}
+
+
+### ============================================================================
+### 5. Reject And Ask For Another Editor Pass
+### ============================================================================
+### This keeps the workflow paused on editor until the revision is acceptable.
+
+POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
+Content-Type: application/json
+
+{
+  "approved": false,
+  "feedback": "Please make the draft shorter and more executive in tone."
+}
+
+
+### ============================================================================
+### Health Check
+### ============================================================================
+
+GET http://localhost:7071/api/health
