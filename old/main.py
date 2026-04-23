@@ -1,4 +1,25 @@
-"""IaC Deployment Assistant — multi-agent HITL workflow."""
+# Copyright (c) Microsoft. All rights reserved.
+
+"""IaC Deployment Assistant — multi-agent HITL workflow.
+
+Architecture
+~~~~~~~~~~~~
+Phase 1 — iterative review loop::
+
+    drafter → validator → reviewer  [HITL PAUSE]
+         ↑                           │
+         └── human feedback ←────────┘
+
+Phase 2 — deployment (runs once after approval)::
+
+    publisher → notifier → deployer → reporter
+
+Prerequisites
+~~~~~~~~~~~~~
+- ``FOUNDRY_PROJECT_ENDPOINT`` and ``FOUNDRY_DEFAULT_MODEL`` in .env
+- ``ADO_ORG``, ``ADO_PAT`` for Azure DevOps operations
+- ``az login`` for Foundry authentication
+"""
 
 import asyncio
 import logging
@@ -10,9 +31,9 @@ from agent_framework.orchestrations import AgentRequestInfoResponse, SequentialB
 
 import config
 from tools.azure_devops_tools import AzureDevOpsTools
-from tools.pipeline_tools import PipelineTools
-from tools.teams_tools import TeamsTools
 from tools.terraform_tools import TerraformTools
+from tools.teams_tools import TeamsTools
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -119,7 +140,6 @@ def _build_agents(
     orchestrator_llm: object,
     ado_tools: AzureDevOpsTools,
     terraform_tools: TerraformTools,
-    pipeline_tools: PipelineTools,
     teams_tools: TeamsTools | None,
 ) -> dict[str, Agent]:
     """Construct all agents once, return them keyed by name."""
@@ -216,8 +236,8 @@ def _build_agents(
             "get_pipeline_runs. Report whether deployment succeeded or failed."
         ),
         tools=[
-            pipeline_tools.get_pipeline_runs,
-            pipeline_tools.get_pipeline_run_status,
+            ado_tools.get_pipeline_runs,
+            ado_tools.get_pipeline_run_status,
         ],
     )
 
@@ -254,17 +274,12 @@ async def main() -> None:
         default_project=config.ado_project(),
     )
     terraform_tools = TerraformTools()
-    pipeline_tools = PipelineTools(
-        organization=config.ado_org(),
-        auth_token=config.ado_pat_b64(),
-        default_project=config.ado_project(),
-    )
 
     webhook = config.get_env("TEAMS_WEBHOOK_URL")
     teams_tools = TeamsTools(webhook_url=webhook) if webhook else None
 
     agents = _build_agents(
-        llm, orchestrator_llm, ado_tools, terraform_tools, pipeline_tools, teams_tools,
+        llm, orchestrator_llm, ado_tools, terraform_tools, teams_tools,
     )
 
     # ── Prompt ────────────────────────────────────────────────────

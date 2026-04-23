@@ -15,77 +15,41 @@ if _src_dir not in sys.path:
     sys.path.insert(0, _src_dir)
 
 from executors.drafter_executor import DrafterExecutor
-from executors.editor_executor import ReviewerExecutor
+from executors.reviewer_executor import ReviewerExecutor
 from executors.finalizer_executor import PublisherExecutor
 from executors.input_router_executor import InputRouterExecutor
 from tools.azure_devops_tools import AzureDevOpsTools
-from tools.terraform_tools import TerraformTools
+from azure.ai.projects import AIProjectClient
+from agents.terraform_drafter import create_terraform_drafter_agent
+from agents.reviewer import create_reviewer_agent
 
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
 def create_workflow() -> Workflow:
-    client = FoundryChatClient(
+    credential = AzureCliCredential()
+    
+    project = AIProjectClient(
+        endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+        credential=credential,
+    )
+    
+    foundry_client = FoundryChatClient(
         project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
         model=os.environ["FOUNDRY_DEFAULT_MODEL"],
         credential=AzureCliCredential(),
     )
 
-    terraform_tools = TerraformTools()
 
-    drafter = Agent(
-        client=client,
-        name="drafter",
-        instructions=(
-            "You are a Terraform expert. Given a user request for Azure "
-            "infrastructure, generate the necessary .tf files. Output them as "
-            'a JSON list: [{"filename": "main.tf", "content": "..."}, ...]. '
-            "Follow Azure best practices and use azurerm provider. "
-            "If previous feedback is provided, incorporate ALL of it."
-        ),
-    )
+    terraform_drafter = create_terraform_drafter_agent(project, foundry_client)
 
-    validator = Agent(
-        client=client,
-        name="validator",
-        instructions=(
-            "You are an IaC validator. Run validate_terraform and "
-            "format_terraform on the Terraform files from the drafter. "
-            "If validation fails, describe the errors. "
-            "If it passes, output the formatted files as the same JSON list."
-        ),
-        tools=[
-            terraform_tools.validate_terraform,
-            terraform_tools.format_terraform,
-        ],
-    )
+    reviewer = create_reviewer_agent(project, foundry_client)
 
-    reviewer = Agent(
-        client=client,
-        name="reviewer",
-        instructions=(
-            "You are a Terraform reviewer. Present the validated Terraform "
-            "configuration in a clear summary:\n"
-            "1. List each resource (type, name, key settings)\n"
-            "2. Highlight region, SKU/tier, and cost-relevant choices\n"
-            "3. Flag potential issues or recommendations\n"
-            "End with: 'Please approve or provide feedback for changes.'"
-        ),
-    )
-
-    pat_b64 = base64.b64encode(
-        f"ado@agent:{os.environ['ADO_PAT']}".encode()
-    ).decode()
-    ado_tools = AzureDevOpsTools(
-        organization=os.environ["ADO_ORG"],
-        auth_token=pat_b64,
-        default_project=os.environ.get("ADO_DEFAULT_PROJECT"),
-    )
 
     repo = os.environ.get("ADO_REPO", "ai-scenarios")
     publisher = Agent(
-        client=client,
+        client=foundry_client,
         name="publisher",
         instructions=(
             "You are a Git operations specialist. Push the validated Terraform "
@@ -93,15 +57,11 @@ def create_workflow() -> Workflow:
             "Then create a Pull Request using create_pull_request. "
             "Output the PR URL."
         ),
-        tools=[
-            ado_tools.push_terraform_branch,
-            ado_tools.create_pull_request,
-        ],
     )
 
     input_router = InputRouterExecutor()
-    drafter_executor = DrafterExecutor(drafter)
-    reviewer_executor = ReviewerExecutor(validator, reviewer, drafter)
+    drafter_executor = DrafterExecutor(terraform_drafter)
+    reviewer_executor = ReviewerExecutor(reviewer, terraform_drafter)
     publisher_executor = PublisherExecutor(publisher)
 
     return (

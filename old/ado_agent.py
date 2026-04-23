@@ -1,4 +1,10 @@
-"""DevUI single-agent for interactive IaC operations."""
+# Copyright (c) Microsoft. All rights reserved.
+
+"""DevUI single-agent for interactive IaC operations.
+
+Exposes the same tools as the multi-agent workflow (main.py) in a
+conversational UI on http://localhost:8090.
+"""
 
 from agent_framework import Agent
 from agent_framework_devui import serve

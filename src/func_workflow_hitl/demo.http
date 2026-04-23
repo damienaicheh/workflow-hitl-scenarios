@@ -42,7 +42,7 @@ Content-Type: application/json
 ### 2. Check Workflow Status
 ### ============================================================================
 
-@instanceId = <PASTE_INSTANCE_ID_HERE>
+@instanceId = 8d6122cb27f94782bbff3095d631b1de
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 

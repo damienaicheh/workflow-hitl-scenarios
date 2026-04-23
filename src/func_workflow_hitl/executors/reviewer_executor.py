@@ -11,21 +11,13 @@ from utils.response_format import extract_response_text
 
 
 class ReviewerExecutor(Executor):
-    """Validate Terraform output from the drafter and present for human review.
-
-    Uses a validator agent (with terraform tools) and a reviewer agent
-    (for human-readable summaries). Implements the HITL approval loop:
-    on rejection, the drafter output is revised incorporating feedback.
-    """
-
-    def __init__(self, validator_agent: Agent, reviewer_agent: Agent, drafter_agent: Agent) -> None:
+    def __init__(self, reviewer_agent: Agent, drafter_agent: Agent) -> None:
         super().__init__(id="reviewer_executor")
-        self._validator = validator_agent
         self._reviewer = reviewer_agent
         self._drafter = drafter_agent
 
-    async def _validate(self, terraform_json: str) -> str:
-        response = await self._validator.run(
+    async def _review(self, terraform_json: str) -> str:
+        response = await self._reviewer.run(
             f"Validate and format these Terraform files:\n{terraform_json}"
         )
         return extract_response_text(response)
