@@ -80,3 +80,58 @@ Content-Type: application/json
 ### ============================================================================
 
 GET http://localhost:7071/api/health
+
+### ============================================================================
+### 5. Chat with the Orchestrator Agent
+### ============================================================================
+### The orchestrator collects the 4 required fields (service, region, options,
+### recipient_email) then triggers the workflow via HTTP tools.
+
+POST http://localhost:7071/api/chat
+Content-Type: application/json
+
+{
+  "message": "I want to deploy a Linux App Service with Application Insights in westeurope. Send the summary to aminelemsih@microsoft.com."
+}
+
+### Continue the conversation (reuse thread_id returned by the previous call).
+
+@threadId = 43b15b8d-6be9-4663-b84e-635b2c3d6e89
+
+POST http://localhost:7071/api/chat
+Content-Type: application/json
+
+{
+  "thread_id": "{{threadId}}",
+  "message": "yes"
+}
+
+### Ask for the status of a running deployment.
+
+POST http://localhost:7071/api/chat
+Content-Type: application/json
+
+{
+  "thread_id": "{{threadId}}",
+  "message": "what is the status?"
+}
+
+### Approve the review through the chat (the orchestrator calls respond_to_review).
+
+POST http://localhost:7071/api/chat
+Content-Type: application/json
+
+{
+  "thread_id": "{{threadId}}",
+  "message": "approve, looks good"
+}
+
+### Reject through the chat with explicit feedback.
+
+POST http://localhost:7071/api/chat
+Content-Type: application/json
+
+{
+  "thread_id": "{{threadId}}",
+  "message": "reject: use Premium v3 plan instead of Standard S1"
+}
