@@ -19,9 +19,9 @@ class InputRouterExecutor(Executor):
         data = json.loads(input_data) if isinstance(input_data, str) else input_data
         request = InfraRequest.model_validate(data)
 
-        prompt = (
-            f"Deploy an Azure {request.service} in {request.region}."
-        )
+        ctx.set_state("recipient_email", request.recipient_email)
+
+        prompt = f"Deploy an Azure {request.service} in {request.region}."
         if request.options:
             prompt += f" Additional requirements: {request.options}"
 

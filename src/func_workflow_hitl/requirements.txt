@@ -3,8 +3,11 @@ agent-framework-foundry==1.1.0
 agent-framework-durabletask==1.0.0b260421
 agent-framework-azurefunctions==1.0.0b260421
 agent-framework-orchestrations==1.0.0b260409
+mcp==1.27.0
 python-dotenv==1.1.1
 azure-identity==1.25.3
 azure-ai-projects==2.1.0
+azure-communication-email==1.0.0
 aiohttp==3.13.5
 pydantic==2.13.3
+pydantic[email]==2.13.3

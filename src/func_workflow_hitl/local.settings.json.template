@@ -10,6 +10,8 @@
     "ADO_ORG": "<ADO_ORG>",
     "ADO_PAT": "<ADO_PAT>",
     "ADO_DEFAULT_PROJECT": "<ADO_DEFAULT_PROJECT>",
-    "ADO_REPO": "<ADO_REPO>"
+    "ADO_REPO": "<ADO_REPO>",
+    "ACS_EMAIL_CONNECTION_STRING": "<ACS_EMAIL_CONNECTION_STRING>",
+    "ACS_EMAIL_SENDER": "<DoNotReply@example.azurecomm.net>"
   }
 }

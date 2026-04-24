@@ -14,6 +14,10 @@ if _src_dir not in sys.path:
 
 from agents.publisher import build_publisher_agent, register_publisher_agent
 from agents.reviewer import build_reviewer_agent, register_reviewer_agent
+from agents.summary_email import (
+    build_summary_email_agent,
+    register_summary_email_agent,
+)
 from agents.terraform_drafter import (
     build_terraform_drafter_agent,
     register_terraform_drafter_agent,
@@ -23,6 +27,7 @@ from executors.drafter_executor import DrafterExecutor
 from executors.finalizer_executor import PublisherExecutor
 from executors.input_router_executor import InputRouterExecutor
 from executors.reviewer_executor import ReviewerExecutor
+from executors.summary_executor import SummaryExecutor
 from tools.azure_devops_tools import AzureDevOpsTools
 
 env_path = Path(__file__).parent / ".env"
@@ -49,6 +54,7 @@ def create_workflow() -> Workflow:
     terraform_drafter_name = register_terraform_drafter_agent(project)
     reviewer_name = register_reviewer_agent(project)
     publisher_name = register_publisher_agent(project, repo, ado_project)
+    summary_email_name = register_summary_email_agent(project)
 
     def create_drafter_agent() -> Agent:
         return build_terraform_drafter_agent(terraform_drafter_name)
@@ -59,6 +65,9 @@ def create_workflow() -> Workflow:
     def create_publisher_agent() -> Agent:
         return build_publisher_agent(publisher_name)
 
+    def create_summary_email_agent() -> Agent:
+        return build_summary_email_agent(summary_email_name)
+
     input_router = InputRouterExecutor()
     drafter_executor = DrafterExecutor(create_drafter_agent)
     reviewer_executor = ReviewerExecutor(create_reviewer_agent, create_drafter_agent)
@@ -68,12 +77,14 @@ def create_workflow() -> Workflow:
         repo,
         ado_project,
     )
+    summary_executor = SummaryExecutor(create_summary_email_agent)
 
     return (
         WorkflowBuilder(start_executor=input_router)
         .add_edge(input_router, drafter_executor)
         .add_edge(drafter_executor, reviewer_executor)
         .add_edge(reviewer_executor, publisher_executor)
+        .add_edge(publisher_executor, summary_executor)
         .build()
     )
 

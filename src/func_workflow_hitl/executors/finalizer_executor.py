@@ -4,7 +4,6 @@ from agent_framework import Agent, Executor, WorkflowContext, handler
 from models.publisher_result import PublisherResult
 from pydantic import BaseModel, ValidationError
 from tools.azure_devops_tools import AzureDevOpsTools
-from typing_extensions import Never
 from utils.agent_runtime import managed_agent
 
 
@@ -34,7 +33,7 @@ class PublisherExecutor(Executor):
     async def publish(
         self,
         approved_terraform: str,
-        ctx: WorkflowContext[Never, dict[str, object]],
+        ctx: WorkflowContext[dict],
     ) -> None:
         agent = self._agent_factory()
 
@@ -88,4 +87,5 @@ class PublisherExecutor(Executor):
             project=self._project,
         )
 
-        await ctx.yield_output(published_result.model_dump(mode="json"))
+        ctx.set_state("approved_terraform", approved_terraform)
+        await ctx.send_message(published_result.model_dump(mode="json"))

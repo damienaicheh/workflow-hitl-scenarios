@@ -24,7 +24,8 @@ Content-Type: application/json
 {
   "service": "App Service",
   "region": "westeurope",
-  "options": "Linux plan, Standard S1 tier, with Application Insights"
+  "options": "Linux plan, Standard S1 tier, with Application Insights",
+  "recipient_email": "aminelemsih@microsoft.com"
 }
 
 ### Another example — Storage Account with CDN.
@@ -35,14 +36,15 @@ Content-Type: application/json
 {
   "service": "Storage Account",
   "region": "francecentral",
-  "options": "Blob containers for media and backups, plus a CDN endpoint"
+  "options": "Blob containers for media and backups, plus a CDN endpoint",
+  "recipient_email": "aminelemsih@microsoft.com"
 }
 
 ### ============================================================================
 ### 2. Check Workflow Status
 ### ============================================================================
 
-@instanceId = ae58966062b9498caeaf60cea68e69b9
+@instanceId = 1c4e03016dfc49438fa965896a96b632
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
@@ -50,7 +52,7 @@ GET http://localhost:7071/api/workflow/status/{{instanceId}}
 ### 3. Approve the Terraform Review
 ### ============================================================================
 
-@requestId = 1a7fb885-944c-487f-8e40-5335abdaa738
+@requestId = 152ede0d-0f60-4bbd-b705-639edb0f62bc
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
