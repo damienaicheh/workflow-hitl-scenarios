@@ -42,7 +42,7 @@ Content-Type: application/json
 ### 2. Check Workflow Status
 ### ============================================================================
 
-@instanceId = 8d6122cb27f94782bbff3095d631b1de
+@instanceId = ae58966062b9498caeaf60cea68e69b9
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
@@ -50,7 +50,7 @@ GET http://localhost:7071/api/workflow/status/{{instanceId}}
 ### 3. Approve the Terraform Review
 ### ============================================================================
 
-@requestId = <PASTE_REQUEST_ID_HERE>
+@requestId = 1a7fb885-944c-487f-8e40-5335abdaa738
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
