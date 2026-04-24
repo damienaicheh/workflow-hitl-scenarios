@@ -1,18 +1,22 @@
+from collections.abc import Callable
+
 from agent_framework import (
     Agent,
     Executor,
     WorkflowContext,
     handler,
 )
-from utils.response_format import extract_response_text
+from models.terraform_bundle import TerraformBundle
+from pydantic import ValidationError
+from utils.agent_runtime import managed_agent
 
 
 class DrafterExecutor(Executor):
     """Generate Terraform files from a natural-language infrastructure request."""
 
-    def __init__(self, agent: Agent) -> None:
+    def __init__(self, agent_factory: Callable[[], Agent]) -> None:
         super().__init__(id="drafter_executor")
-        self._agent = agent
+        self._agent_factory = agent_factory
 
     @handler
     async def draft(
@@ -20,12 +24,26 @@ class DrafterExecutor(Executor):
         prompt: str,
         ctx: WorkflowContext[str],
     ) -> None:
+        agent = self._agent_factory()
         instruction = (
             "Generate the Terraform .tf files for the following Azure "
-            "infrastructure request. Output them as a JSON list: "
-            '[{"filename": "main.tf", "content": "..."}, ...]. '
+            "infrastructure request. Return a Terraform bundle with a top-level "
+            "'files' array. Each file entry must contain only 'filename' and "
+            "'content'. "
             "Follow Azure best practices and use azurerm provider.\n\n"
             f"Request:\n{prompt}"
         )
-        response = await self._agent.run(instruction)
-        await ctx.send_message(extract_response_text(response))
+        async with managed_agent(agent):
+            response = await agent.run(
+                instruction,
+                options={"response_format": TerraformBundle},
+            )
+
+        try:
+            bundle = TerraformBundle.model_validate(response.value)
+        except ValidationError as exc:
+            raise ValueError(
+                "Drafter agent did not return a valid Terraform bundle."
+            ) from exc
+
+        await ctx.send_message(bundle.to_json_list())

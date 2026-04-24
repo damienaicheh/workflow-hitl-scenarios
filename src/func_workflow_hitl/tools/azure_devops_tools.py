@@ -5,32 +5,38 @@ from typing import Annotated, Any
 import aiohttp
 from agent_framework import MCPStdioTool, tool
 from pydantic import Field
-
-from utils.env import get_first_env, require_env
+from utils.env import get_first_env
 
 ADO_API_VERSION = "7.1"
 
 
 class AzureDevOpsTools:
+    """Azure DevOps Git operations via REST API and the local MCP server."""
+
     def __init__(self, organization: str, auth_token: str, default_project: str | None):
-        self.organization = organization
-        self.auth_token = auth_token
+        self.organization = self._normalize_organization(organization)
+        self.auth_token = self._encode_pat(auth_token)
         self.default_project = default_project
 
+    def _normalize_organization(self, organization: str) -> str:
+        cleaned_organization = organization.removeprefix(
+            "https://dev.azure.com/"
+        ).strip("/")
+        if not cleaned_organization:
+            raise ValueError("Azure DevOps organization cannot be empty.")
 
-    def _resolve_ado_org(self) -> str:
-        return require_env("ADO_ORG").removeprefix("https://dev.azure.com/").strip("/")
+        return cleaned_organization
 
-
-    def _resolve_pat_credential(self) -> str:
-        raw_pat = get_first_env("ADO_PAT")
-        if not raw_pat:
-            raise ValueError("PAT auth requires ADO_PAT.")
+    def _encode_pat(self, personal_access_token: str) -> str:
+        cleaned_pat = personal_access_token.strip()
+        if not cleaned_pat:
+            raise ValueError("Azure DevOps PAT cannot be empty.")
 
         # Azure DevOps only uses the PAT portion of username:pat, so any non-empty placeholder works.
         pat_identity = "ado@example.invalid"
-        return base64.b64encode(f"{pat_identity}:{raw_pat}".encode("utf-8")).decode("utf-8")
-
+        return base64.b64encode(f"{pat_identity}:{cleaned_pat}".encode("utf-8")).decode(
+            "utf-8"
+        )
 
     def _resolve_ado_domains(self) -> list[str]:
         raw_domains = get_first_env("ADO_DOMAINS")
@@ -39,29 +45,27 @@ class AzureDevOpsTools:
 
         return [domain.strip() for domain in raw_domains.split(",") if domain.strip()]
 
-
     def build_ado_mcp_tool(self) -> MCPStdioTool:
         tool_args = [
             "-y",
             "@azure-devops/mcp",
-            self.resolve_ado_org(),
+            self.organization,
             "--authentication",
             "pat",
         ]
 
-        for domain in self.resolve_ado_domains():
+        for domain in self._resolve_ado_domains():
             tool_args.extend(["-d", domain])
 
         return MCPStdioTool(
             name="azure_devops",
             command="npx",
             args=tool_args,
-            env={"PERSONAL_ACCESS_TOKEN": self.resolve_pat_credential()},
+            env={"PERSONAL_ACCESS_TOKEN": self.auth_token},
             load_prompts=False,
             approval_mode="never_require",
             description="Azure DevOps tools exposed through the local Azure DevOps MCP server.",
         )
-
 
     def _resolve_project(self, project: str | None) -> str:
         if project and project.strip():
@@ -84,6 +88,17 @@ class AzureDevOpsTools:
     def _normalize_branch_name(self, branch: str) -> str:
         cleaned_branch = branch.strip()
         return cleaned_branch.removeprefix("refs/heads/")
+
+    def _pull_request_web_url(
+        self,
+        project: str,
+        repository_name: str,
+        pull_request_id: int,
+    ) -> str:
+        return (
+            f"https://dev.azure.com/{self.organization}/{project}"
+            f"/_git/{repository_name}/pullrequest/{pull_request_id}"
+        )
 
     def _normalize_repo_path(self, path: str) -> str:
         cleaned_path = path.strip()
@@ -185,6 +200,158 @@ class AzureDevOpsTools:
         raise ValueError(
             f"Branch '{branch_name}' was not found in repository '{repository_id}'."
         )
+
+    async def create_branch(
+        self,
+        repository: str,
+        branch_name: str,
+        project: str | None = None,
+        base_branch: str | None = None,
+    ) -> dict[str, Any]:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+        repository_name = str(repository_info.get("name") or repository)
+        normalized_branch_name = self._normalize_branch_name(branch_name)
+        normalized_base_branch = self._normalize_branch_name(
+            base_branch or self._default_branch_name(repository_info)
+        )
+
+        default_ref = await self._resolve_branch_ref(
+            resolved_project,
+            repository_id,
+            normalized_base_branch,
+        )
+        old_object_id = str(default_ref["objectId"])
+
+        response = await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/refs",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload=[
+                {
+                    "name": f"refs/heads/{normalized_branch_name}",
+                    "oldObjectId": "0" * 40,
+                    "newObjectId": old_object_id,
+                }
+            ],
+            expected_statuses=(200, 201),
+        )
+
+        results = response.get("value", []) if response else []
+        if not results:
+            raise ValueError(
+                f"Azure DevOps did not return a branch creation result for '{normalized_branch_name}'."
+            )
+
+        result = results[0]
+        if not result.get("success"):
+            update_status = result.get("updateStatus") or "unknown"
+            custom_message = result.get("customMessage")
+            detail = (
+                f"{update_status}: {custom_message}"
+                if custom_message
+                else update_status
+            )
+            raise ValueError(
+                f"Failed to create branch '{normalized_branch_name}' in repository '{repository_name}': {detail}"
+            )
+
+        return {
+            "branch_name": normalized_branch_name,
+            "base_branch": normalized_base_branch,
+            "project": resolved_project,
+            "repository": repository_name,
+            "head_commit_id": old_object_id,
+        }
+
+    async def create_pull_request(
+        self,
+        repository: str,
+        branch_name: str,
+        title: str,
+        description: str,
+        project: str | None = None,
+        target_branch: str | None = None,
+    ) -> dict[str, Any]:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+        repository_name = str(repository_info.get("name") or repository)
+        normalized_branch_name = self._normalize_branch_name(branch_name)
+        normalized_target_branch = self._normalize_branch_name(
+            target_branch or self._default_branch_name(repository_info)
+        )
+
+        response = await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/pullrequests",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload={
+                "sourceRefName": f"refs/heads/{normalized_branch_name}",
+                "targetRefName": f"refs/heads/{normalized_target_branch}",
+                "title": title,
+                "description": description,
+            },
+            expected_statuses=(200, 201),
+        )
+
+        if not response:
+            raise ValueError(
+                f"Azure DevOps did not return a pull request response for branch '{normalized_branch_name}'."
+            )
+
+        pull_request_id = response.get("pullRequestId")
+        if not isinstance(pull_request_id, int):
+            raise ValueError(
+                f"Azure DevOps returned an invalid pull request identifier for branch '{normalized_branch_name}'."
+            )
+
+        return {
+            "pull_request_id": pull_request_id,
+            "pull_request_url": self._pull_request_web_url(
+                resolved_project,
+                repository_name,
+                pull_request_id,
+            ),
+            "source_branch": normalized_branch_name,
+            "target_branch": normalized_target_branch,
+            "title": title,
+            "status": response.get("status"),
+        }
+
+    async def get_pull_request(
+        self,
+        repository: str,
+        pull_request_id: int,
+        project: str | None = None,
+    ) -> dict[str, Any]:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+
+        response = await self._request_json(
+            "GET",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/pullrequests/{pull_request_id}",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            expected_statuses=(200,),
+        )
+
+        if not response:
+            raise ValueError(
+                f"Azure DevOps did not return pull request '{pull_request_id}'."
+            )
+
+        return response
 
     async def _file_exists(
         self, project: str, repository_id: str, path: str, branch: str
@@ -315,3 +482,114 @@ class AzureDevOpsTools:
             result += f" Commit: {commit_id}."
 
         return result
+
+    @tool(
+        name="push_terraform_branch",
+        description="Push multiple Terraform files to an existing Azure DevOps branch.",
+        approval_mode="never_require",
+    )
+    async def push_terraform_branch(
+        self,
+        repository: Annotated[
+            str,
+            Field(description="Azure DevOps repository name."),
+        ],
+        branch_name: Annotated[
+            str,
+            Field(
+                description="Existing branch name to update, for example 'infra/add-app-service'."
+            ),
+        ],
+        terraform_files_json: Annotated[
+            str,
+            Field(
+                description="JSON string containing a list of objects with either 'path' or 'filename', plus 'content'."
+            ),
+        ],
+        commit_message: Annotated[
+            str,
+            Field(description="Commit message for the push."),
+        ],
+        project: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
+            ),
+        ] = None,
+    ) -> str:
+        resolved_project = self._resolve_project(project)
+        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_id = str(repository_info["id"])
+        normalized_branch_name = self._normalize_branch_name(branch_name)
+
+        branch_ref = await self._resolve_branch_ref(
+            resolved_project,
+            repository_id,
+            normalized_branch_name,
+        )
+
+        files = json.loads(terraform_files_json)
+        if not isinstance(files, list):
+            raise ValueError("terraform_files_json must decode to a list of files.")
+
+        changes: list[dict[str, Any]] = []
+        for file_data in files:
+            if not isinstance(file_data, dict):
+                raise ValueError("Each Terraform file entry must be an object.")
+
+            path = file_data.get("path")
+            filename = file_data.get("filename")
+            content = file_data.get("content")
+            if not isinstance(content, str):
+                raise ValueError(
+                    "Each Terraform file entry must include a string 'content' field."
+                )
+
+            if isinstance(path, str):
+                normalized_path = self._normalize_repo_path(path)
+            elif isinstance(filename, str):
+                normalized_path = self._normalize_repo_path(
+                    filename if filename.startswith("/") else f"/infra/{filename}"
+                )
+            else:
+                raise ValueError(
+                    "Each Terraform file entry must include a string 'path' or 'filename' field."
+                )
+
+            exists = await self._file_exists(
+                resolved_project,
+                repository_id,
+                normalized_path,
+                normalized_branch_name,
+            )
+            changes.append(
+                {
+                    "changeType": "edit" if exists else "add",
+                    "item": {"path": normalized_path},
+                    "newContent": {"content": content, "contentType": "rawtext"},
+                }
+            )
+
+        await self._request_json(
+            "POST",
+            self._build_url(
+                resolved_project,
+                f"/_apis/git/repositories/{repository_id}/pushes",
+            ),
+            params={"api-version": ADO_API_VERSION},
+            payload={
+                "refUpdates": [
+                    {
+                        "name": f"refs/heads/{normalized_branch_name}",
+                        "oldObjectId": branch_ref["objectId"],
+                    }
+                ],
+                "commits": [{"comment": commit_message, "changes": changes}],
+            },
+            expected_statuses=(200, 201),
+        )
+
+        return (
+            f"Branch '{normalized_branch_name}' updated with {len(files)} file(s) "
+            f"in project '{resolved_project}'."
+        )
