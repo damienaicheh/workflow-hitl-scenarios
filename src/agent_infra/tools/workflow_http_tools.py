@@ -12,12 +12,8 @@ class WorkflowHttpTools:
     the workflow can be driven from anywhere, including from a Teams bot.
     """
 
-    def __init__(self, base_url: str | None = None) -> None:
-        self._base_url = (
-            base_url
-            or os.environ.get("WORKFLOW_API_BASE_URL")
-            or "http://localhost:7071"
-        ).rstrip("/")
+    def __init__(self) -> None:
+        self._base_url = (os.environ["WORKFLOW_API_BASE_URL"]).rstrip("/")
 
     async def trigger_workflow(
         self,

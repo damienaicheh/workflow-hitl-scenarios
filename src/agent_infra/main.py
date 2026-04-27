@@ -1,13 +1,23 @@
 import os
 
-from agent_framework import Agent
+from agent_framework._agents import Agent
+from agent_framework_foundry import FoundryChatClient
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
+from azure.identity import AzureCliCredential
+from dotenv import load_dotenv
 from tools.workflow_http_tools import WorkflowHttpTools
-from utils.env import create_foundry_client
+
+load_dotenv()
 
 
-def create_orchestrator_agent(project_client: AIProjectClient) -> Agent:
+def main():
+    credential = AzureCliCredential()
+    project_client = AIProjectClient(
+        endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+        credential=credential,
+    )
+
     instructions = """
         You are the IaC deployment orchestrator. You converse with a user
         (directly or via Teams) and drive the Durable workflow that drafts,
@@ -50,7 +60,7 @@ def create_orchestrator_agent(project_client: AIProjectClient) -> Agent:
     """
 
     orchestrator_agent = project_client.agents.create_version(
-        agent_name="OrchestratorAgent",
+        agent_name="InfraOrchestratorAgent",
         definition=PromptAgentDefinition(
             model=os.environ["FOUNDRY_ORCHESTRATOR_MODEL"],
             instructions=instructions.strip(),
@@ -59,8 +69,12 @@ def create_orchestrator_agent(project_client: AIProjectClient) -> Agent:
 
     workflow_http_tools = WorkflowHttpTools()
 
-    return Agent(
-        client=create_foundry_client(),
+    orchestrator_agent = Agent(
+        client=FoundryChatClient(
+            project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+            model=os.environ["FOUNDRY_ORCHESTRATOR_MODEL"],
+            credential=AzureCliCredential(),
+        ),
         name=orchestrator_agent.name,
         tools=[
             workflow_http_tools.trigger_workflow,
@@ -68,3 +82,7 @@ def create_orchestrator_agent(project_client: AIProjectClient) -> Agent:
             workflow_http_tools.respond_to_review,
         ],
     )
+
+
+if __name__ == "__main__":
+    main()
