@@ -1,7 +1,8 @@
 import os
-from typing import Any
+from typing import Annotated, Any
 
 import aiohttp
+from agent_framework import tool
 
 
 class WorkflowHttpTools:
@@ -40,12 +41,19 @@ class WorkflowHttpTools:
                         return {}
                 return await response.json()
 
+    @tool(
+        name="trigger_infra_workflow",
+        description="Trigger a new IaC creation workflow and return the workflow instance ID.",
+    )
     async def trigger_workflow(
         self,
-        service: str,
-        region: str,
-        options: str,
-        recipient_email: str,
+        service: Annotated[
+            str, "The azure service to deploy (e.g. 'App Service', 'Storage Account')."
+        ],
+        region: Annotated[
+            str, "The Azure region to deploy the service to (e.g. 'westeurope')."
+        ],
+        options: Annotated[str, "Free text describing SKU, tier, extra features."],
     ) -> dict[str, Any]:
         """Start a new IaC deployment workflow.
 
@@ -62,12 +70,20 @@ class WorkflowHttpTools:
             "service": service,
             "region": region,
             "options": options,
-            "recipient_email": recipient_email,
         }
         data = await self._request_json("POST", "/api/workflow/run", payload)
         return {"instance_id": data.get("instanceId") or data.get("instance_id")}
 
-    async def get_workflow_status(self, instance_id: str) -> dict[str, Any]:
+    @tool(
+        name="get_workflow_status",
+        description="Get the current status of a running IaC workflow given its instance ID.",
+    )
+    async def get_workflow_status(
+        self,
+        instance_id: Annotated[
+            str, "The workflow instance identifier returned by trigger_workflow."
+        ],
+    ) -> dict[str, Any]:
         """Return the current status of a running IaC workflow.
 
         Args:
