@@ -1,5 +1,8 @@
 import os
 
+from agent_framework.foundry import FoundryChatClient
+from azure.identity import AzureCliCredential
+
 
 def get_first_env(*names: str) -> str | None:
     for name in names:
@@ -16,4 +19,12 @@ def require_env(*names: str) -> str:
     joined_names = ", ".join(names)
     raise ValueError(
         f"Missing required environment variable. Set one of: {joined_names}"
+    )
+
+
+def create_foundry_client() -> FoundryChatClient:
+    return FoundryChatClient(
+        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
+        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
+        credential=AzureCliCredential(),
     )

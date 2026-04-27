@@ -1,23 +1,13 @@
 import os
 
 from agent_framework import Agent
-from agent_framework.foundry import FoundryChatClient
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
-from azure.identity import AzureCliCredential
 from tools.email_tools import AcsEmailTools
+from utils.env import create_foundry_client
 
 
-def _create_foundry_client() -> FoundryChatClient:
-    return FoundryChatClient(
-        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
-        credential=AzureCliCredential(),
-    )
-
-
-def register_summary_email_agent(project_client: AIProjectClient) -> str:
-
+def create_summary_email_agent(project_client: AIProjectClient) -> Agent:
     instructions = """
         You are a summary and email agent. You receive:
         - the approved Terraform configuration,
@@ -44,15 +34,10 @@ def register_summary_email_agent(project_client: AIProjectClient) -> str:
         ),
     )
 
-    return summary_agent.name
-
-
-def build_summary_email_agent(agent_name: str) -> Agent:
-
     email_tools = AcsEmailTools()
 
     return Agent(
-        client=_create_foundry_client(),
-        name=agent_name,
+        client=create_foundry_client(),
+        name=summary_agent.name,
         tools=[email_tools.send_email],
     )

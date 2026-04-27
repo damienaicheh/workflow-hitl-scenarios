@@ -1,25 +1,13 @@
 import os
 
 from agent_framework import Agent
-from agent_framework.foundry import FoundryChatClient
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
-from azure.identity import AzureCliCredential
 from tools.workflow_http_tools import WorkflowHttpTools
+from utils.env import create_foundry_client
 
 
-def _create_foundry_client() -> FoundryChatClient:
-    return FoundryChatClient(
-        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ.get(
-            "FOUNDRY_ORCHESTRATOR_MODEL", os.environ["FOUNDRY_DEFAULT_MODEL"]
-        ),
-        credential=AzureCliCredential(),
-    )
-
-
-def register_orchestrator_agent(project_client: AIProjectClient) -> str:
-
+def create_orchestrator_agent(project_client: AIProjectClient) -> Agent:
     instructions = """
         You are the IaC deployment orchestrator. You converse with a user
         (directly or via Teams) and drive the Durable workflow that drafts,
@@ -29,7 +17,6 @@ def register_orchestrator_agent(project_client: AIProjectClient) -> str:
         - service: the Azure service to deploy (e.g. App Service, Storage Account)
         - region: the Azure region (e.g. westeurope)
         - options: SKU, tier, extra features (free text)
-        - recipient_email: the email that will receive the deployment summary
 
         Ask naturally for any missing information in a single short message.
         Never invent values. Once you have all four, summarize them back and
@@ -65,24 +52,16 @@ def register_orchestrator_agent(project_client: AIProjectClient) -> str:
     orchestrator_agent = project_client.agents.create_version(
         agent_name="OrchestratorAgent",
         definition=PromptAgentDefinition(
-            model=os.environ.get(
-                "FOUNDRY_ORCHESTRATOR_MODEL",
-                os.environ["FOUNDRY_DEFAULT_MODEL"],
-            ),
+            model=os.environ["FOUNDRY_ORCHESTRATOR_MODEL"],
             instructions=instructions.strip(),
         ),
     )
 
-    return orchestrator_agent.name
-
-
-def build_orchestrator_agent(agent_name: str) -> Agent:
-
     workflow_http_tools = WorkflowHttpTools()
 
     return Agent(
-        client=_create_foundry_client(),
-        name=agent_name,
+        client=create_foundry_client(),
+        name=orchestrator_agent.name,
         tools=[
             workflow_http_tools.trigger_workflow,
             workflow_http_tools.get_workflow_status,

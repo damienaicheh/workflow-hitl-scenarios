@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class InfraRequest(BaseModel):
@@ -10,7 +10,4 @@ class InfraRequest(BaseModel):
     region: str = Field(description="Azure region (e.g. westeurope, francecentral)")
     options: str | None = Field(
         default=None, description="Additional options: SKU, tier, features, etc."
-    )
-    recipient_email: EmailStr = Field(
-        description="Email address that will receive the deployment summary."
     )

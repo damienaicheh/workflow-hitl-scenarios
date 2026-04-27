@@ -14,9 +14,9 @@ from utils.agent_runtime import managed_agent
 class DrafterExecutor(Executor):
     """Generate Terraform files from a natural-language infrastructure request."""
 
-    def __init__(self, agent_factory: Callable[[], Agent]) -> None:
+    def __init__(self, drafter_agent: Agent) -> None:
         super().__init__(id="drafter_executor")
-        self._agent_factory = agent_factory
+        self._drafter_agent = drafter_agent
 
     @handler
     async def draft(
@@ -24,17 +24,17 @@ class DrafterExecutor(Executor):
         prompt: str,
         ctx: WorkflowContext[str],
     ) -> None:
-        agent = self._agent_factory()
-        instruction = (
-            "Generate the Terraform .tf files for the following Azure "
-            "infrastructure request. Return a Terraform bundle with a top-level "
-            "'files' array. Each file entry must contain only 'filename' and "
-            "'content'. "
-            "Follow Azure best practices and use azurerm provider.\n\n"
-            f"Request:\n{prompt}"
-        )
-        async with managed_agent(agent):
-            response = await agent.run(
+        instruction = f"""
+            Generate the Terraform .tf files for the following Azure
+            infrastructure request. Return a Terraform bundle with a top-level
+            'files' array. Each file entry must contain only 'filename' and
+            'content'.
+            Follow Azure best practices and use azurerm provider.\n\n
+            Request:\n{prompt}
+        """
+
+        async with managed_agent(self._drafter_agent):
+            response = await self._drafter_agent.run(
                 instruction,
                 options={"response_format": TerraformBundle},
             )

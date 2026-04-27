@@ -1,29 +1,20 @@
 import os
 
 from agent_framework import Agent
-from agent_framework.foundry import FoundryChatClient
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
-from azure.identity import AzureCliCredential
+from utils.env import create_foundry_client
 
 
-def _create_foundry_client() -> FoundryChatClient:
-    return FoundryChatClient(
-        project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
-        credential=AzureCliCredential(),
-    )
-
-
-def register_publisher_agent(
+def create_publisher_agent(
     project_client: AIProjectClient,
-    repo: str,
-    project: str,
-) -> str:
+) -> Agent:
+    ado_project = os.environ["ADO_DEFAULT_PROJECT"]
+    repository = os.environ["ADO_REPO"]
 
     instructions = f"""
         You are a publisher agent. Do not ask for confirmation.
-        The Azure DevOps project is '{project}' and the repository is '{repo}'.
+        The Azure DevOps project is '{ado_project}' and the repository is '{repository}'.
         You do not modify Terraform. You only choose the branch name,
         pull request title, and pull request description for publication.
         Do not claim that a branch or pull request already exists.
@@ -38,11 +29,7 @@ def register_publisher_agent(
         ),
     )
 
-    return publisher_agent.name
-
-
-def build_publisher_agent(agent_name: str) -> Agent:
     return Agent(
-        client=_create_foundry_client(),
-        name=agent_name,
+        client=create_foundry_client(),
+        name=publisher_agent.name,
     )

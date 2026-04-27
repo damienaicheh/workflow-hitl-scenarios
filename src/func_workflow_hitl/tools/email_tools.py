@@ -15,17 +15,8 @@ class AcsEmailTools:
 
     def __init__(self) -> None:
         self._sender = os.environ["ACS_EMAIL_SENDER"]
-        connection_string = os.environ.get("ACS_EMAIL_CONNECTION_STRING")
-        if connection_string:
-            self._client = EmailClient.from_connection_string(connection_string)
-            return
-
-        endpoint = os.environ.get("ACS_EMAIL_ENDPOINT")
-        if not endpoint:
-            raise RuntimeError(
-                "Set ACS_EMAIL_CONNECTION_STRING or ACS_EMAIL_ENDPOINT to use AcsEmailTools."
-            )
-        self._client = EmailClient(endpoint, AzureCliCredential())
+        connection_string = os.environ["ACS_EMAIL_CONNECTION_STRING"]
+        self._client = EmailClient.from_connection_string(connection_string)
 
     async def send_email(
         self,

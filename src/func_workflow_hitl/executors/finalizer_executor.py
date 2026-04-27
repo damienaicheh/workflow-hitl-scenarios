@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 
 from agent_framework import Agent, Executor, WorkflowContext, handler
@@ -18,16 +19,10 @@ class PublisherExecutor(Executor):
 
     def __init__(
         self,
-        agent_factory: Callable[[], Agent],
-        azure_devops_tools: AzureDevOpsTools,
-        repository: str,
-        project: str,
+        publisher_agent: Agent,
     ) -> None:
         super().__init__(id="publisher_executor")
-        self._agent_factory = agent_factory
-        self._azure_devops_tools = azure_devops_tools
-        self._repository = repository
-        self._project = project
+        self._publisher_agent = publisher_agent
 
     @handler
     async def publish(
@@ -35,16 +30,26 @@ class PublisherExecutor(Executor):
         approved_terraform: str,
         ctx: WorkflowContext[dict],
     ) -> None:
-        agent = self._agent_factory()
+        ado_project = os.environ["ADO_DEFAULT_PROJECT"]
 
-        async with managed_agent(agent):
-            response = await agent.run(
-                "The Terraform bundle below is already approved and immutable. "
-                "Do not modify it. Do not ask for confirmation. "
-                "Return a publication plan with exactly these fields: branch_name, "
-                "pull_request_title, and pull_request_description. "
-                "Do not claim that a branch or pull request already exists.\n\n"
-                f"Approved Terraform bundle:\n{approved_terraform}",
+        azure_devops_tools = AzureDevOpsTools(
+            organization=os.environ["ADO_ORG"],
+            auth_token=os.environ["ADO_PAT"],
+            default_project=ado_project,
+        )
+
+        repository = os.environ["ADO_REPO"]
+
+        async with managed_agent(self._publisher_agent):
+            response = await self._publisher_agent.run(
+                f"""
+                    The Terraform bundle below is already approved and immutable.
+                    Do not modify it. Do not ask for confirmation.
+                    Return a publication plan with exactly these fields: branch_name,
+                    pull_request_title, and pull_request_description.
+                    Do not claim that a branch or pull request already exists.\n\n
+                    Approved Terraform bundle:\n{approved_terraform}
+                """,
                 options={"response_format": PublisherProposal},
             )
 
@@ -55,24 +60,24 @@ class PublisherExecutor(Executor):
                 "Publisher agent did not return a valid publication plan."
             ) from exc
 
-        created_branch = await self._azure_devops_tools.create_branch(
-            repository=self._repository,
+        created_branch = await azure_devops_tools.create_branch(
+            repository=repository,
             branch_name=proposal.branch_name,
-            project=self._project,
+            project=ado_project,
         )
-        await self._azure_devops_tools.push_terraform_branch(
-            repository=self._repository,
+        await azure_devops_tools.push_terraform_branch(
+            repository=repository,
             branch_name=str(created_branch["branch_name"]),
             terraform_files_json=approved_terraform,
             commit_message=proposal.pull_request_title,
-            project=self._project,
+            project=ado_project,
         )
-        pull_request = await self._azure_devops_tools.create_pull_request(
-            repository=self._repository,
+        pull_request = await azure_devops_tools.create_pull_request(
+            repository=repository,
             branch_name=str(created_branch["branch_name"]),
             title=proposal.pull_request_title,
             description=proposal.pull_request_description,
-            project=self._project,
+            project=ado_project,
         )
 
         published_result = PublisherResult(
@@ -81,10 +86,10 @@ class PublisherExecutor(Executor):
             pull_request_url=str(pull_request["pull_request_url"]),
         )
 
-        await self._azure_devops_tools.get_pull_request(
-            repository=self._repository,
+        await azure_devops_tools.get_pull_request(
+            repository=repository,
             pull_request_id=published_result.pull_request_id,
-            project=self._project,
+            project=ado_project,
         )
 
         ctx.set_state("approved_terraform", approved_terraform)

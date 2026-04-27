@@ -24,8 +24,7 @@ Content-Type: application/json
 {
   "service": "App Service",
   "region": "westeurope",
-  "options": "Linux plan, Standard S1 tier, with Application Insights",
-  "recipient_email": "aminelemsih@microsoft.com"
+  "options": "Linux plan, Standard S1 tier, with Application Insights"
 }
 
 ### Another example — Storage Account with CDN.
@@ -36,15 +35,14 @@ Content-Type: application/json
 {
   "service": "Storage Account",
   "region": "francecentral",
-  "options": "Blob containers for media and backups, plus a CDN endpoint",
-  "recipient_email": "aminelemsih@microsoft.com"
+  "options": "Blob containers for media and backups, plus a CDN endpoint"
 }
 
 ### ============================================================================
 ### 2. Check Workflow Status
 ### ============================================================================
 
-@instanceId = 1c4e03016dfc49438fa965896a96b632
+@instanceId = 6980aa08e1c049b8b791817012122443
 
 GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
@@ -52,7 +50,7 @@ GET http://localhost:7071/api/workflow/status/{{instanceId}}
 ### 3. Approve the Terraform Review
 ### ============================================================================
 
-@requestId = 152ede0d-0f60-4bbd-b705-639edb0f62bc
+@requestId = 6ed64b29-1b6c-4236-a034-024959f4bcb5
 
 POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
@@ -85,7 +83,6 @@ GET http://localhost:7071/api/health
 ### 5. Chat with the Orchestrator Agent
 ### ============================================================================
 ### The orchestrator collects the 4 required fields (service, region, options,
-### recipient_email) then triggers the workflow via HTTP tools.
 
 POST http://localhost:7071/api/chat
 Content-Type: application/json

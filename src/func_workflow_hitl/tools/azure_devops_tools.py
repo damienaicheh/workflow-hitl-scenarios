@@ -116,7 +116,7 @@ class AzureDevOpsTools:
         url: str,
         *,
         params: dict[str, str] | None = None,
-        payload: dict[str, Any] | None = None,
+        payload: dict[str, Any] | list[dict[str, Any]] | None = None,
         expected_statuses: tuple[int, ...] = (200,),
         allow_404: bool = False,
     ) -> dict[str, Any] | None:
@@ -174,9 +174,9 @@ class AzureDevOpsTools:
 
         return response
 
-    async def _resolve_branch_ref(
+    async def _find_branch_ref(
         self, project: str, repository_id: str, branch: str
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         branch_name = self._normalize_branch_name(branch)
         response = await self._request_json(
             "GET",
@@ -197,9 +197,48 @@ class AzureDevOpsTools:
             if ref.get("name") == ref_name:
                 return ref
 
+        return None
+
+    async def _resolve_branch_ref(
+        self, project: str, repository_id: str, branch: str
+    ) -> dict[str, Any]:
+        branch_name = self._normalize_branch_name(branch)
+        ref = await self._find_branch_ref(project, repository_id, branch_name)
+        if ref is not None:
+            return ref
+
         raise ValueError(
             f"Branch '{branch_name}' was not found in repository '{repository_id}'."
         )
+
+    async def _next_available_branch_name(
+        self, project: str, repository_id: str, branch: str
+    ) -> str:
+        normalized_branch_name = self._normalize_branch_name(branch)
+        if (
+            await self._find_branch_ref(
+                project,
+                repository_id,
+                normalized_branch_name,
+            )
+            is None
+        ):
+            return normalized_branch_name
+
+        suffix = 2
+        while True:
+            candidate_branch_name = f"{normalized_branch_name}-{suffix}"
+            if (
+                await self._find_branch_ref(
+                    project,
+                    repository_id,
+                    candidate_branch_name,
+                )
+                is None
+            ):
+                return candidate_branch_name
+
+            suffix += 1
 
     async def create_branch(
         self,
@@ -224,32 +263,55 @@ class AzureDevOpsTools:
         )
         old_object_id = str(default_ref["objectId"])
 
-        response = await self._request_json(
-            "POST",
-            self._build_url(
-                resolved_project,
-                f"/_apis/git/repositories/{repository_id}/refs",
-            ),
-            params={"api-version": ADO_API_VERSION},
-            payload=[
-                {
-                    "name": f"refs/heads/{normalized_branch_name}",
-                    "oldObjectId": "0" * 40,
-                    "newObjectId": old_object_id,
-                }
-            ],
-            expected_statuses=(200, 201),
+        candidate_branch_name = await self._next_available_branch_name(
+            resolved_project,
+            repository_id,
+            normalized_branch_name,
         )
 
-        results = response.get("value", []) if response else []
-        if not results:
-            raise ValueError(
-                f"Azure DevOps did not return a branch creation result for '{normalized_branch_name}'."
+        for _ in range(10):
+            response = await self._request_json(
+                "POST",
+                self._build_url(
+                    resolved_project,
+                    f"/_apis/git/repositories/{repository_id}/refs",
+                ),
+                params={"api-version": ADO_API_VERSION},
+                payload=[
+                    {
+                        "name": f"refs/heads/{candidate_branch_name}",
+                        "oldObjectId": "0" * 40,
+                        "newObjectId": old_object_id,
+                    }
+                ],
+                expected_statuses=(200, 201),
             )
 
-        result = results[0]
-        if not result.get("success"):
+            results = response.get("value", []) if response else []
+            if not results:
+                raise ValueError(
+                    f"Azure DevOps did not return a branch creation result for '{candidate_branch_name}'."
+                )
+
+            result = results[0]
+            if result.get("success"):
+                return {
+                    "branch_name": candidate_branch_name,
+                    "base_branch": normalized_base_branch,
+                    "project": resolved_project,
+                    "repository": repository_name,
+                    "head_commit_id": old_object_id,
+                }
+
             update_status = result.get("updateStatus") or "unknown"
+            if update_status == "staleOldObjectId":
+                candidate_branch_name = await self._next_available_branch_name(
+                    resolved_project,
+                    repository_id,
+                    normalized_branch_name,
+                )
+                continue
+
             custom_message = result.get("customMessage")
             detail = (
                 f"{update_status}: {custom_message}"
@@ -257,16 +319,12 @@ class AzureDevOpsTools:
                 else update_status
             )
             raise ValueError(
-                f"Failed to create branch '{normalized_branch_name}' in repository '{repository_name}': {detail}"
+                f"Failed to create branch '{candidate_branch_name}' in repository '{repository_name}': {detail}"
             )
 
-        return {
-            "branch_name": normalized_branch_name,
-            "base_branch": normalized_base_branch,
-            "project": resolved_project,
-            "repository": repository_name,
-            "head_commit_id": old_object_id,
-        }
+        raise ValueError(
+            f"Failed to create a unique branch for '{normalized_branch_name}' in repository '{repository_name}' after repeated collisions."
+        )
 
     async def create_pull_request(
         self,
