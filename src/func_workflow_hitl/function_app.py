@@ -11,7 +11,6 @@ from agents.terraform_drafter import create_terraform_drafter_agent
 from azure.ai.projects import AIProjectClient
 from dotenv import load_dotenv
 from executors.drafter_executor import DrafterExecutor
-from executors.finalizer_executor import PublisherExecutor
 from executors.input_router_executor import InputRouterExecutor
 from executors.reviewer_executor import ReviewerExecutor
 from executors.summary_executor import SummaryExecutor
@@ -36,21 +35,14 @@ def create_workflow() -> Workflow:
 
     input_router = InputRouterExecutor()
     drafter_executor = DrafterExecutor(drafter_agent)
-    reviewer_executor = ReviewerExecutor(
-        reviewer_agent,
-        drafter_agent,
-    )
-    publisher_executor = PublisherExecutor(
-        publisher_agent,
-    )
+    reviewer_executor = ReviewerExecutor(reviewer_agent, drafter_agent, publisher_agent)
     summary_executor = SummaryExecutor(summary_agent)
 
     return (
         WorkflowBuilder(start_executor=input_router)
         .add_edge(input_router, drafter_executor)
         .add_edge(drafter_executor, reviewer_executor)
-        .add_edge(reviewer_executor, publisher_executor)
-        .add_edge(publisher_executor, summary_executor)
+        .add_edge(reviewer_executor, summary_executor)
         .build()
     )
 

@@ -8,3 +8,4 @@ class ReviewerApprovalRequest:
     terraform_json: str
     summary: str
     prompt: str
+    publisher_result_payload: dict[str, object]
