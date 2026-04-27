@@ -4,3 +4,10 @@ resource "azurerm_user_assigned_identity" "this" {
   location            = local.resource_group_location
   tags                = local.tags
 }
+
+resource "azurerm_user_assigned_identity" "function_identity" {
+  name                = format("id-func-%s", local.resource_suffix_kebabcase)
+  resource_group_name = local.resource_group_name
+  location            = local.resource_group_location
+  tags                = local.tags
+}

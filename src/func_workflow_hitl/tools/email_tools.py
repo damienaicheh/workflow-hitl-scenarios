@@ -2,15 +2,12 @@ import os
 from typing import Any
 
 from azure.communication.email import EmailClient
-from azure.identity import AzureCliCredential
 
 
 class AcsEmailTools:
     """Send emails through Azure Communication Services.
 
-    Supports two auth modes:
-    - connection string via `ACS_EMAIL_CONNECTION_STRING`
-    - Entra ID via `ACS_EMAIL_ENDPOINT` + AzureCliCredential
+    Uses the ACS connection string from `ACS_EMAIL_CONNECTION_STRING`.
     """
 
     def __init__(self) -> None:

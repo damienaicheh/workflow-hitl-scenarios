@@ -32,3 +32,11 @@ terraform plan -out plan.out
 ```bash
 terraform apply plan.out
 ```
+
+Deploy the Function App using the Azure CLI:
+
+```bash
+func azure functionapp publish <function_app_name>
+```
+
+Update the ADO PAT (Azure DevOps Personal Access Token) in your Key Vault so that the Function App can access it securely.

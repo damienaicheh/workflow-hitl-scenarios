@@ -3,6 +3,7 @@
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "python",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AZURE_CLIENT_ID": "<AZURE_FUNCTION_IDENTITY_CLIENT_ID> ignore it locally",
     "TASKHUB_NAME": "<TASKHUB_NAME>",
     "FOUNDRY_PROJECT_ENDPOINT": "<FOUNDRY_PROJECT_ENDPOINT>",
     "FOUNDRY_DEFAULT_MODEL": "<FOUNDRY_DEFAULT_MODEL>",
@@ -13,7 +14,6 @@
     "ADO_REPO": "<ADO_REPO>",
     "ACS_EMAIL_CONNECTION_STRING": "<ACS_EMAIL_CONNECTION_STRING>",
     "ACS_EMAIL_SENDER": "<DoNotReply@example.azurecomm.net>",
-    "ACS_RECIPIENT_EMAIL": "<ACS_RECIPIENT_EMAIL>",
-    "WORKFLOW_API_BASE_URL": "http://localhost:7071"
+    "ACS_RECIPIENT_EMAIL": "<ACS_RECIPIENT_EMAIL>"
   }
 }

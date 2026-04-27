@@ -9,20 +9,20 @@ from agents.reviewer import create_reviewer_agent
 from agents.summary_email import create_summary_email_agent
 from agents.terraform_drafter import create_terraform_drafter_agent
 from azure.ai.projects import AIProjectClient
-from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 from executors.drafter_executor import DrafterExecutor
 from executors.finalizer_executor import PublisherExecutor
 from executors.input_router_executor import InputRouterExecutor
 from executors.reviewer_executor import ReviewerExecutor
 from executors.summary_executor import SummaryExecutor
+from utils.env import create_azure_credential
 
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
 def create_workflow() -> Workflow:
-    credential = AzureCliCredential()
+    credential = create_azure_credential()
 
     project = AIProjectClient(
         endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],

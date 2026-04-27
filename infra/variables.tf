@@ -1,13 +1,13 @@
 variable "domain" {
   description = "Azure deployment domain"
   type        = string
-  default     = "poc6"
+  default     = "wkf"
 }
 
 variable "workload" {
   description = "Azure deployment workload"
   type        = string
-  default     = "iac"
+  default     = "hitl"
 }
 
 variable "environment" {
@@ -23,13 +23,13 @@ variable "environment" {
 variable "location" {
   description = "Azure deployment location"
   type        = string
-  default     = "swedencentral"
+  default     = "switzerlandnorth"
 }
 
 variable "region" {
   description = "Azure deployment region"
   type        = string
-  default     = "swe"
+  default     = "sln"
 }
 
 variable "tags" {
@@ -42,4 +42,14 @@ variable "resource_group_name" {
   type        = string
   description = "The name of the resource group"
   default     = ""
+}
+
+variable "acs_email_sender" {
+  type        = string
+  description = "Azure Communication Service email sender"
+}
+
+variable "acs_recipient_email" {
+  type        = string
+  description = "Recipient email"
 }

@@ -48,3 +48,18 @@ resource "azapi_resource" "conn_storage" {
     "identity.principalId"
   ]
 }
+
+
+resource "azurerm_storage_account" "func_flex" {
+  name                     = format("stfunc%s", local.resource_suffix_lowercase)
+  resource_group_name      = local.resource_group_name
+  location                 = local.resource_group_location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_storage_container" "func_flex_container" {
+  name                  = "func-flex-container"
+  storage_account_id    = azurerm_storage_account.func_flex.id
+  container_access_type = "private"
+}
