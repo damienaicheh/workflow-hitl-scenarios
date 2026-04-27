@@ -14,6 +14,31 @@ class WorkflowHttpTools:
 
     def __init__(self) -> None:
         self._base_url = (os.environ["WORKFLOW_API_BASE_URL"]).rstrip("/")
+        self._headers = {
+            "x-functions-key": os.environ["WORKFLOW_API_FUNCTION_KEY"],
+        }
+
+    async def _request_json(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        *,
+        allow_empty_response: bool = False,
+    ) -> dict[str, Any]:
+        async with aiohttp.ClientSession(headers=self._headers) as session:
+            async with session.request(
+                method,
+                f"{self._base_url}{path}",
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                if allow_empty_response:
+                    try:
+                        return await response.json()
+                    except Exception:
+                        return {}
+                return await response.json()
 
     async def trigger_workflow(
         self,
@@ -39,13 +64,7 @@ class WorkflowHttpTools:
             "options": options,
             "recipient_email": recipient_email,
         }
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{self._base_url}/api/workflow/run",
-                json=payload,
-            ) as response:
-                response.raise_for_status()
-                data = await response.json()
+        data = await self._request_json("POST", "/api/workflow/run", payload)
         return {"instance_id": data.get("instanceId") or data.get("instance_id")}
 
     async def get_workflow_status(self, instance_id: str) -> dict[str, Any]:
@@ -54,50 +73,4 @@ class WorkflowHttpTools:
         Args:
             instance_id: The workflow instance identifier returned by trigger_workflow.
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self._base_url}/api/workflow/status/{instance_id}"
-            ) as response:
-                response.raise_for_status()
-                return await response.json()
-
-    async def respond_to_review(
-        self,
-        instance_id: str,
-        approved: bool,
-        feedback: str,
-    ) -> dict[str, Any]:
-        """Respond to the human-in-the-loop review step of a workflow.
-
-        Call this only when the user has explicitly approved or rejected the
-        Terraform review. On rejection, ``feedback`` must contain the changes
-        requested by the user so the drafter can redraft.
-
-        Args:
-            instance_id: The workflow instance identifier.
-            approved: True to approve the Terraform review, False to reject.
-            feedback: Free text feedback from the user (required on rejection,
-                optional but recommended on approval).
-        """
-        status = await self.get_workflow_status(instance_id)
-        pending = status.get("pendingHumanInputRequests") or []
-        if not pending:
-            return {
-                "accepted": False,
-                "reason": "No pending human input request for this workflow.",
-                "runtime_status": status.get("runtimeStatus"),
-            }
-        request_id = pending[0].get("requestId") or pending[0].get("request_id")
-
-        payload = {"approved": approved, "feedback": feedback}
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{self._base_url}/api/workflow/respond/{instance_id}/{request_id}",
-                json=payload,
-            ) as response:
-                response.raise_for_status()
-                try:
-                    body = await response.json()
-                except Exception:
-                    body = {}
-        return {"accepted": True, "request_id": request_id, "response": body}
+        return await self._request_json("GET", f"/api/workflow/status/{instance_id}")

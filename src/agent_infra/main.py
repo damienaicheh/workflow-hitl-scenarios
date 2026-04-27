@@ -1,3 +1,4 @@
+import logging
 import os
 
 from agent_framework._agents import Agent
@@ -12,6 +13,8 @@ load_dotenv()
 
 
 def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     credential = AzureCliCredential()
     project_client = AIProjectClient(
         endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
@@ -37,21 +40,16 @@ def main():
         the conversation. Reply with a short acknowledgement and tell the
         user that the Terraform draft will be prepared and sent for their
         approval.
+        
+        When approved give him the instance_id so he can track the progress 
+        which is his customer ticket number.
 
         If the user asks for the status of an existing deployment, call
         get_workflow_status with the instance_id and summarize the result
         in plain language (running, waiting for human approval, completed,
-        failed). Do not dump raw JSON to the user.
-
-        When the workflow is waiting for human approval
-        (runtimeStatus=Completed with customStatus waiting_for_human_input
-        or a pendingHumanInputRequests entry), invite the user to approve
-        or reject the Terraform review. If the user replies with approval
-        (e.g. 'approve', 'ok', 'go'), call respond_to_review with
-        approved=True and a short feedback such as 'approved'. If the user
-        rejects or asks for changes, call respond_to_review with
-        approved=False and pass the user's requested changes verbatim as
-        feedback.
+        failed). 
+        
+        Never dump raw JSON to the user.
 
         Do not approve or reject on behalf of the user. Only call
         respond_to_review when the user has explicitly asked for it.
@@ -79,9 +77,12 @@ def main():
         tools=[
             workflow_http_tools.trigger_workflow,
             workflow_http_tools.get_workflow_status,
-            workflow_http_tools.respond_to_review,
         ],
     )
+
+    print("==================================")
+    print("Infra Orchestrator Agent is ready.")
+    print("==================================")
 
 
 if __name__ == "__main__":
