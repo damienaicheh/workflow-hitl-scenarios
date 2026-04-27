@@ -16,7 +16,7 @@ resource "azapi_resource" "conn_aai" {
   body = {
     properties = {
       category = "AppInsights"
-      target   = azurerm_application_insights.this.connection_string
+      target   =  azurerm_application_insights.this.id
       authType = "ApiKey"
       credentials = {
         key = azurerm_application_insights.this.instrumentation_key

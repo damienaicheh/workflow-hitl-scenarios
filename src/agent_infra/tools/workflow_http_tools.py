@@ -14,7 +14,7 @@ class WorkflowHttpTools:
     """
 
     def __init__(self) -> None:
-        self._base_url = (os.environ["WORKFLOW_API_BASE_URL"]).rstrip("/")
+        self._base_url = os.environ["WORKFLOW_API_BASE_URL"]
         self._headers = {
             "x-functions-key": os.environ["WORKFLOW_API_FUNCTION_KEY"],
         }
@@ -72,7 +72,10 @@ class WorkflowHttpTools:
             "options": options,
         }
         data = await self._request_json("POST", "/api/workflow/run", payload)
-        return {"instance_id": data.get("instanceId") or data.get("instance_id")}
+        instance_id = data.get("instanceId")
+        if not instance_id:
+            raise RuntimeError("Workflow backend did not return an instance ID.")
+        return {"instance_id": instance_id}
 
     @tool(
         name="get_workflow_status",
