@@ -15,11 +15,13 @@
 ### 5. Run: func start
 ### ============================================================================
 
-
+@host = https://func-dev-sln-wkf-hitl-25a4.azurewebsites.net
+@x_functions_key = <YOUR_FUNCTION_KEY_HERE_FOR_FUNCTION_APP_ONLY>
 ### 1. Start a new IaC workflow.
 
-POST http://localhost:7071/api/workflow/run
+POST {{host}}/api/workflow/run
 Content-Type: application/json
+x-functions-key:{{x_functions_key}}
 
 {
   "service": "App Service",
@@ -29,8 +31,9 @@ Content-Type: application/json
 
 ### Another example — Storage Account with CDN.
 
-POST http://localhost:7071/api/workflow/run
+POST {{host}}/api/workflow/run
 Content-Type: application/json
+x-functions-key:{{x_functions_key}}
 
 {
   "service": "Storage Account",
@@ -44,7 +47,8 @@ Content-Type: application/json
 
 @instanceId = 6980aa08e1c049b8b791817012122443
 
-GET http://localhost:7071/api/workflow/status/{{instanceId}}
+GET {{host}}/api/workflow/status/{{instanceId}}
+x-functions-key:{{x_functions_key}}
 
 ### ============================================================================
 ### 3. Approve the Terraform Review
@@ -52,8 +56,9 @@ GET http://localhost:7071/api/workflow/status/{{instanceId}}
 
 @requestId = 6ed64b29-1b6c-4236-a034-024959f4bcb5
 
-POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
+POST {{host}}/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
+x-functions-key:{{x_functions_key}}
 
 {
   "approved": true,
@@ -65,8 +70,9 @@ Content-Type: application/json
 ### ============================================================================
 ### The reviewer will re-draft incorporating your feedback.
 
-POST http://localhost:7071/api/workflow/respond/{{instanceId}}/{{requestId}}
+POST {{host}}/api/workflow/respond/{{instanceId}}/{{requestId}}
 Content-Type: application/json
+x-functions-key:{{x_functions_key}}
 
 {
   "approved": false,
@@ -77,58 +83,5 @@ Content-Type: application/json
 ### Health Check
 ### ============================================================================
 
-GET http://localhost:7071/api/health
-
-### ============================================================================
-### 5. Chat with the Orchestrator Agent
-### ============================================================================
-### The orchestrator collects the 4 required fields (service, region, options,
-
-POST http://localhost:7071/api/chat
-Content-Type: application/json
-
-{
-  "message": "I want to deploy a Linux App Service with Application Insights in westeurope. Send the summary to aminelemsih@microsoft.com."
-}
-
-### Continue the conversation (reuse thread_id returned by the previous call).
-
-@threadId = 43b15b8d-6be9-4663-b84e-635b2c3d6e89
-
-POST http://localhost:7071/api/chat
-Content-Type: application/json
-
-{
-  "thread_id": "{{threadId}}",
-  "message": "yes"
-}
-
-### Ask for the status of a running deployment.
-
-POST http://localhost:7071/api/chat
-Content-Type: application/json
-
-{
-  "thread_id": "{{threadId}}",
-  "message": "what is the status?"
-}
-
-### Approve the review through the chat (the orchestrator calls respond_to_review).
-
-POST http://localhost:7071/api/chat
-Content-Type: application/json
-
-{
-  "thread_id": "{{threadId}}",
-  "message": "approve, looks good"
-}
-
-### Reject through the chat with explicit feedback.
-
-POST http://localhost:7071/api/chat
-Content-Type: application/json
-
-{
-  "thread_id": "{{threadId}}",
-  "message": "reject: use Premium v3 plan instead of Standard S1"
-}
+GET {{host}}/api/health
+x-functions-key:{{x_functions_key}}
