@@ -9,6 +9,7 @@ from agents.reviewer import create_reviewer_agent
 from agents.summary_email import create_summary_email_agent
 from agents.terraform_drafter import create_terraform_drafter_agent
 from azure.ai.projects import AIProjectClient
+from configs.ado_config import AdoConfig
 from dotenv import load_dotenv
 from executors.drafter_executor import DrafterExecutor
 from executors.input_router_executor import InputRouterExecutor
@@ -28,9 +29,16 @@ def create_workflow() -> Workflow:
         credential=credential,
     )
 
+    ado_config = AdoConfig(
+        organisation=os.environ["ADO_ORG"],
+        personal_access_token=os.environ["ADO_PAT"],
+        default_project=os.environ["ADO_DEFAULT_PROJECT"],
+        repository=os.environ["ADO_REPO"],
+    )
+
     drafter_agent = create_terraform_drafter_agent(project)
     reviewer_agent = create_reviewer_agent(project)
-    publisher_agent = create_publisher_agent(project)
+    publisher_agent = create_publisher_agent(project, ado_config)
     summary_agent = create_summary_email_agent(project)
 
     input_router = InputRouterExecutor()

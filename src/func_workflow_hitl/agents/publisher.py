@@ -3,15 +3,16 @@ import os
 from agent_framework import Agent
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
+from configs.ado_config import AdoConfig
 from tools.azure_devops_tools import AzureDevOpsTools
 from utils.env import create_foundry_client
 
 
 def create_publisher_agent(
-    project_client: AIProjectClient,
+    project_client: AIProjectClient, ado_config: AdoConfig
 ) -> Agent:
-    ado_project = os.environ["ADO_DEFAULT_PROJECT"]
-    repository = os.environ["ADO_REPO"]
+    ado_project = ado_config.default_project
+    repository = ado_config.repository
 
     instructions = f"""
         You are a publisher agent. Do not ask for confirmation.
@@ -40,12 +41,7 @@ def create_publisher_agent(
         ),
     )
 
-    azure_devops_tools = AzureDevOpsTools(
-        organization=os.environ["ADO_ORG"],
-        auth_token=os.environ["ADO_PAT"],
-        default_project=ado_project,
-        default_repository=repository,
-    )
+    azure_devops_tools = AzureDevOpsTools(ado_config=ado_config)
 
     return Agent(
         client=create_foundry_client(with_advanced_model=True),

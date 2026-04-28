@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 import aiohttp
 from agent_framework import tool
+from configs.ado_config import AdoConfig
 from pydantic import Field
 
 ADO_API_VERSION = "7.1"
@@ -14,17 +15,12 @@ class AzureDevOpsTools:
 
     def __init__(
         self,
-        organization: str,
-        auth_token: str,
-        default_project: str | None,
-        default_repository: str | None = None,
+        ado_config: AdoConfig,
     ):
-        self.organization = self._normalize_organization(organization)
-        self.auth_token = self._encode_pat(auth_token)
-        self.default_project = default_project
-        self.default_repository = (
-            default_repository.strip() if default_repository else None
-        )
+        self.organization = self._normalize_organization(ado_config.organisation)
+        self.auth_token = self._encode_pat(ado_config.personal_access_token)
+        self.default_project = ado_config.default_project
+        self.default_repository = ado_config.repository
 
     def _normalize_organization(self, organization: str) -> str:
         cleaned_organization = organization.removeprefix(
