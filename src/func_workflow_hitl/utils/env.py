@@ -36,9 +36,11 @@ def create_azure_credential():
     )
 
 
-def create_foundry_client() -> FoundryChatClient:
+def create_foundry_client(with_advanced_model: bool = False) -> FoundryChatClient:
     return FoundryChatClient(
         project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-        model=os.environ["FOUNDRY_DEFAULT_MODEL"],
+        model=os.environ["FOUNDRY_DEFAULT_MODEL"]
+        if not with_advanced_model
+        else os.environ["FOUNDRY_ORCHESTRATOR_MODEL"],
         credential=create_azure_credential(),
     )

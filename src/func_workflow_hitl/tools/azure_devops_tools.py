@@ -3,9 +3,8 @@ import json
 from typing import Annotated, Any
 
 import aiohttp
-from agent_framework import MCPStdioTool, tool
+from agent_framework import tool
 from pydantic import Field
-from utils.env import get_first_env
 
 ADO_API_VERSION = "7.1"
 
@@ -13,10 +12,19 @@ ADO_API_VERSION = "7.1"
 class AzureDevOpsTools:
     """Azure DevOps Git operations via REST API and the local MCP server."""
 
-    def __init__(self, organization: str, auth_token: str, default_project: str | None):
+    def __init__(
+        self,
+        organization: str,
+        auth_token: str,
+        default_project: str | None,
+        default_repository: str | None = None,
+    ):
         self.organization = self._normalize_organization(organization)
         self.auth_token = self._encode_pat(auth_token)
         self.default_project = default_project
+        self.default_repository = (
+            default_repository.strip() if default_repository else None
+        )
 
     def _normalize_organization(self, organization: str) -> str:
         cleaned_organization = organization.removeprefix(
@@ -38,35 +46,6 @@ class AzureDevOpsTools:
             "utf-8"
         )
 
-    def _resolve_ado_domains(self) -> list[str]:
-        raw_domains = get_first_env("ADO_DOMAINS")
-        if not raw_domains:
-            return []
-
-        return [domain.strip() for domain in raw_domains.split(",") if domain.strip()]
-
-    def build_ado_mcp_tool(self) -> MCPStdioTool:
-        tool_args = [
-            "-y",
-            "@azure-devops/mcp",
-            self.organization,
-            "--authentication",
-            "pat",
-        ]
-
-        for domain in self._resolve_ado_domains():
-            tool_args.extend(["-d", domain])
-
-        return MCPStdioTool(
-            name="azure_devops",
-            command="npx",
-            args=tool_args,
-            env={"PERSONAL_ACCESS_TOKEN": self.auth_token},
-            load_prompts=False,
-            approval_mode="never_require",
-            description="Azure DevOps tools exposed through the local Azure DevOps MCP server.",
-        )
-
     def _resolve_project(self, project: str | None) -> str:
         if project and project.strip():
             return project.strip()
@@ -76,6 +55,17 @@ class AzureDevOpsTools:
 
         raise ValueError(
             "Missing Azure DevOps project. Provide 'project' or set ADO_DEFAULT_PROJECT."
+        )
+
+    def _resolve_repository_name(self, repository: str | None = None) -> str:
+        if repository and repository.strip():
+            return repository.strip()
+
+        if self.default_repository:
+            return self.default_repository
+
+        raise ValueError(
+            "Missing Azure DevOps repository. Provide 'repository' or set a default repository."
         )
 
     def _default_branch_name(self, repository: dict[str, Any]) -> str:
@@ -240,17 +230,45 @@ class AzureDevOpsTools:
 
             suffix += 1
 
+    @tool(
+        name="create_branch",
+        description="Create a new Azure DevOps Git branch and return the actual created branch details.",
+        approval_mode="never_require",
+    )
     async def create_branch(
         self,
-        repository: str,
-        branch_name: str,
-        project: str | None = None,
-        base_branch: str | None = None,
+        branch_name: Annotated[
+            str,
+            Field(
+                description="Requested source branch name, for example 'infra/add-networking'."
+            ),
+        ],
+        project: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
+            ),
+        ] = None,
+        base_branch: Annotated[
+            str | None,
+            Field(
+                description="Base branch name. Uses the repository default branch when omitted."
+            ),
+        ] = None,
+        repository: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps repository name or repository ID. Uses the configured default repository when omitted."
+            ),
+        ] = None,
     ) -> dict[str, Any]:
+        resolved_repository = self._resolve_repository_name(repository)
         resolved_project = self._resolve_project(project)
-        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_info = await self._resolve_repository(
+            resolved_project, resolved_repository
+        )
         repository_id = str(repository_info["id"])
-        repository_name = str(repository_info.get("name") or repository)
+        repository_name = str(repository_info.get("name") or resolved_repository)
         normalized_branch_name = self._normalize_branch_name(branch_name)
         normalized_base_branch = self._normalize_branch_name(
             base_branch or self._default_branch_name(repository_info)
@@ -326,19 +344,51 @@ class AzureDevOpsTools:
             f"Failed to create a unique branch for '{normalized_branch_name}' in repository '{repository_name}' after repeated collisions."
         )
 
+    @tool(
+        name="create_pull_request",
+        description="Create an Azure DevOps pull request from an existing source branch.",
+        approval_mode="never_require",
+    )
     async def create_pull_request(
         self,
-        repository: str,
-        branch_name: str,
-        title: str,
-        description: str,
-        project: str | None = None,
-        target_branch: str | None = None,
+        branch_name: Annotated[
+            str,
+            Field(description="Existing source branch name for the pull request."),
+        ],
+        title: Annotated[
+            str,
+            Field(description="Pull request title."),
+        ],
+        description: Annotated[
+            str,
+            Field(description="Pull request description."),
+        ],
+        project: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
+            ),
+        ] = None,
+        target_branch: Annotated[
+            str | None,
+            Field(
+                description="Target branch name. Uses the repository default branch when omitted."
+            ),
+        ] = None,
+        repository: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps repository name or repository ID. Uses the configured default repository when omitted."
+            ),
+        ] = None,
     ) -> dict[str, Any]:
+        resolved_repository = self._resolve_repository_name(repository)
         resolved_project = self._resolve_project(project)
-        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_info = await self._resolve_repository(
+            resolved_project, resolved_repository
+        )
         repository_id = str(repository_info["id"])
-        repository_name = str(repository_info.get("name") or repository)
+        repository_name = str(repository_info.get("name") or resolved_repository)
         normalized_branch_name = self._normalize_branch_name(branch_name)
         normalized_target_branch = self._normalize_branch_name(
             target_branch or self._default_branch_name(repository_info)
@@ -384,14 +434,35 @@ class AzureDevOpsTools:
             "status": response.get("status"),
         }
 
+    @tool(
+        name="get_pull_request",
+        description="Fetch an Azure DevOps pull request by identifier.",
+        approval_mode="never_require",
+    )
     async def get_pull_request(
         self,
-        repository: str,
-        pull_request_id: int,
-        project: str | None = None,
+        pull_request_id: Annotated[
+            int,
+            Field(description="Azure DevOps pull request identifier."),
+        ],
+        project: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
+            ),
+        ] = None,
+        repository: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps repository name or repository ID. Uses the configured default repository when omitted."
+            ),
+        ] = None,
     ) -> dict[str, Any]:
+        resolved_repository = self._resolve_repository_name(repository)
         resolved_project = self._resolve_project(project)
-        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_info = await self._resolve_repository(
+            resolved_project, resolved_repository
+        )
         repository_id = str(repository_info["id"])
 
         response = await self._request_json(
@@ -440,10 +511,6 @@ class AzureDevOpsTools:
     )
     async def create_file_in_repo(
         self,
-        repository: Annotated[
-            str,
-            Field(description="Azure DevOps repository name or repository ID."),
-        ],
         path: Annotated[
             str,
             Field(
@@ -472,11 +539,20 @@ class AzureDevOpsTools:
                 description="Git commit message. A default message is generated when omitted."
             ),
         ] = None,
+        repository: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps repository name or repository ID. Uses the configured default repository when omitted."
+            ),
+        ] = None,
     ) -> str:
+        resolved_repository = self._resolve_repository_name(repository)
         resolved_project = self._resolve_project(project)
-        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_info = await self._resolve_repository(
+            resolved_project, resolved_repository
+        )
         repository_id = str(repository_info["id"])
-        repository_name = str(repository_info.get("name") or repository)
+        repository_name = str(repository_info.get("name") or resolved_repository)
 
         branch_name = self._normalize_branch_name(
             branch or self._default_branch_name(repository_info)
@@ -542,16 +618,12 @@ class AzureDevOpsTools:
         return result
 
     @tool(
-        name="push_terraform_branch",
-        description="Push multiple Terraform files to an existing Azure DevOps branch.",
+        name="push_files_to_branch",
+        description="Push multiple files to an existing Azure DevOps branch.",
         approval_mode="never_require",
     )
-    async def push_terraform_branch(
+    async def push_files_to_branch(
         self,
-        repository: Annotated[
-            str,
-            Field(description="Azure DevOps repository name."),
-        ],
         branch_name: Annotated[
             str,
             Field(
@@ -574,9 +646,18 @@ class AzureDevOpsTools:
                 description="Azure DevOps project name. Uses ADO_DEFAULT_PROJECT when omitted."
             ),
         ] = None,
+        repository: Annotated[
+            str | None,
+            Field(
+                description="Azure DevOps repository name. Uses the configured default repository when omitted."
+            ),
+        ] = None,
     ) -> str:
+        resolved_repository = self._resolve_repository_name(repository)
         resolved_project = self._resolve_project(project)
-        repository_info = await self._resolve_repository(resolved_project, repository)
+        repository_info = await self._resolve_repository(
+            resolved_project, resolved_repository
+        )
         repository_id = str(repository_info["id"])
         normalized_branch_name = self._normalize_branch_name(branch_name)
 
