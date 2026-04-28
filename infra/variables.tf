@@ -44,11 +44,6 @@ variable "resource_group_name" {
   default     = ""
 }
 
-variable "acs_email_sender" {
-  type        = string
-  description = "Azure Communication Service email sender"
-}
-
 variable "acs_recipient_email" {
   type        = string
   description = "Recipient email"

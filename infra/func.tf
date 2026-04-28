@@ -33,8 +33,8 @@ resource "azurerm_function_app_flex_consumption" "this" {
     "ADO_PAT" : "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.ado_pat.versionless_id})",
     "ADO_DEFAULT_PROJECT" : "ai-scenario",
     "ADO_REPO" : "agent-framework-scenario",
-    "ACS_EMAIL_CONNECTION_STRING" : azurerm_communication_service.this.primary_connection_string
-    "ACS_EMAIL_SENDER" : var.acs_email_sender,
+    "ACS_EMAIL_CONNECTION_STRING" : azurerm_communication_service.this.primary_connection_string,
+    "ACS_EMAIL_SENDER" : format("DoNotReply@%s", azurerm_email_communication_service_domain.this.mail_from_sender_domain),
     "ACS_RECIPIENT_EMAIL" : var.acs_recipient_email,
     "AZURE_CLIENT_ID" : azurerm_user_assigned_identity.function_identity.client_id,
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.this.connection_string
@@ -47,7 +47,7 @@ resource "azurerm_function_app_flex_consumption" "this" {
   }
 
   site_config {
-    health_check_path = "/api/health"
+    health_check_path                 = "/api/health"
     health_check_eviction_time_in_min = 2
   }
 }
