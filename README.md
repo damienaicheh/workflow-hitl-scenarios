@@ -1,4 +1,10 @@
-# Terraform Azure deployment
+# Workflow HITL Scenarios
+
+## Dev Environment Setup
+
+DevContainer setup is provided to ensure a consistent development environment. Open this repository in a DevContainer-enabled editor (like VS Code) to automatically build and launch the container with all dependencies installed.
+
+## Terraform Azure deployment
 
 This repository contains Terraform code to deploy resources in Azure. Follow the steps below to set up and deploy your infrastructure.
 
@@ -31,12 +37,6 @@ terraform plan -out plan.out
 
 ```bash
 terraform apply plan.out
-```
-
-Deploy the Function App using the Azure CLI:
-
-```bash
-func azure functionapp publish <function_app_name>
 ```
 
 Update the ADO PAT (Azure DevOps Personal Access Token) in your Key Vault so that the Function App can access it securely.
