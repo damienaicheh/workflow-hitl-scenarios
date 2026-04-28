@@ -5,11 +5,8 @@ resource "azurerm_storage_account" "this" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
-  ## Identity configuration
   shared_access_key_enabled = false
-
-  ## Network access configuration
-  min_tls_version = "TLS1_2"
+  min_tls_version           = "TLS1_2"
 
   allow_nested_items_to_be_public = false
 
@@ -50,4 +47,19 @@ resource "azapi_resource" "conn_storage" {
   response_export_values = [
     "identity.principalId"
   ]
+}
+
+
+resource "azurerm_storage_account" "func_flex" {
+  name                     = format("stfunc%s", local.resource_suffix_lowercase)
+  resource_group_name      = local.resource_group_name
+  location                 = local.resource_group_location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_storage_container" "func_flex_container" {
+  name                  = "func-flex-container"
+  storage_account_id    = azurerm_storage_account.func_flex.id
+  container_access_type = "private"
 }

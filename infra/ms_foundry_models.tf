@@ -15,12 +15,10 @@ resource "azurerm_cognitive_deployment" "msfoundry_chat_deployment_model" {
   version_upgrade_option = "OnceNewDefaultVersionAvailable"
   rai_policy_name        = "Microsoft.DefaultV2"
 
-
   depends_on = [
     azapi_resource.ms_foundry
   ]
 }
-
 
 resource "azurerm_cognitive_deployment" "msfoundry_chat_deployment_model_advanced" {
   name                 = "gpt-5.1"
@@ -38,7 +36,6 @@ resource "azurerm_cognitive_deployment" "msfoundry_chat_deployment_model_advance
   }
   version_upgrade_option = "OnceNewDefaultVersionAvailable"
   rai_policy_name        = "Microsoft.DefaultV2"
-
 
   depends_on = [
     azapi_resource.ms_foundry

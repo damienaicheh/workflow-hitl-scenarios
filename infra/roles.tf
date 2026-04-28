@@ -155,6 +155,12 @@ resource "azurerm_role_assignment" "acr_push_to_user" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+resource "azurerm_role_assignment" "user_key_vault_administrator" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # =============================================================================
 # Foundry resources role assignments end here
 # =============================================================================
@@ -181,4 +187,50 @@ resource "azurerm_role_assignment" "acr_repository_reader_to_ms_foundry_project"
   scope                = azurerm_container_registry.this.id
   role_definition_name = "Container Registry Repository Reader"
   principal_id         = azapi_resource.ms_foundry_project.output.identity.principalId
+}
+
+## Function App Managed Identity Role Assignments
+
+resource "azurerm_role_assignment" "func_host_blob_data_owner" {
+  scope                = azurerm_storage_account.func_flex.id
+  role_definition_name = "Storage Blob Data Owner"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "func_host_blob_data_contributor" {
+  scope                = azurerm_storage_account.func_flex.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "func_host_queue_data_contributor" {
+  scope                = azurerm_storage_account.func_flex.id
+  role_definition_name = "Storage Queue Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "func_host_table_data_contributor" {
+  scope                = azurerm_storage_account.func_flex.id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "ms_foundry_azure_ai_user_to_function_identity" {
+  scope                = azapi_resource.ms_foundry.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "ms_foundry_project_azure_ai_user_to_function_identity" {
+  scope                = azapi_resource.ms_foundry_project.id
+  role_definition_name = "Azure AI User"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
+}
+
+## Key Vault Role Assignments
+
+resource "azurerm_role_assignment" "function_app_key_vault_secret_user" {
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.function_identity.principal_id
 }

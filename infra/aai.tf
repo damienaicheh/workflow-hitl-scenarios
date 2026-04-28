@@ -7,7 +7,6 @@ resource "azurerm_application_insights" "this" {
   tags                = local.tags
 }
 
-
 resource "azapi_resource" "conn_aai" {
   type                      = "Microsoft.CognitiveServices/accounts/projects/connections@2025-06-01"
   name                      = azurerm_application_insights.this.name
@@ -17,7 +16,7 @@ resource "azapi_resource" "conn_aai" {
   body = {
     properties = {
       category = "AppInsights"
-      target   = azurerm_application_insights.this.connection_string
+      target   = azurerm_application_insights.this.id
       authType = "ApiKey"
       credentials = {
         key = azurerm_application_insights.this.instrumentation_key

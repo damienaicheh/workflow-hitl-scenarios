@@ -19,17 +19,10 @@ resource "azapi_resource" "ms_foundry" {
     }
 
     properties = {
-      # Support both Entra ID and API Key authentication for underlining Cognitive Services account
-      disableLocalAuth = false
-
-      # Specifies that this is an AI Foundry resource
+      disableLocalAuth       = false
       allowProjectManagement = true
-
-      # Set custom subdomain name for DNS names created for this Foundry resource
-      customSubDomainName = format("aif-%s", local.resource_suffix_kebabcase)
-
-      # Network-related controls
-      publicNetworkAccess = "Enabled"
+      customSubDomainName    = format("aif-%s", local.resource_suffix_kebabcase)
+      publicNetworkAccess    = "Enabled"
       networkAcls = {
         defaultAction = "Allow"
       }
@@ -45,10 +38,7 @@ resource "azapi_resource" "ms_foundry" {
   ]
 }
 
-# =============================================================================
-# Account-level capability host (must exist before project-level capability host)
-# =============================================================================
-
+# Account-level capability host (must exist before project-level)
 resource "azapi_resource" "ms_foundry_capability_host" {
   type                      = "Microsoft.CognitiveServices/accounts/capabilityHosts@2026-01-15-preview"
   name                      = format("cap-host-%s", local.resource_suffix_kebabcase)
