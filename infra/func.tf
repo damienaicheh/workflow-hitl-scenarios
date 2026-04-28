@@ -22,9 +22,6 @@ resource "azurerm_function_app_flex_consumption" "this" {
   }
 
   app_settings = {
-    # FUNCTIONS_WORKER_RUNTIME                = "dotnet-isolated"
-    # FUNCTIONS_EXTENSION_VERSION             = "~4"
-    # "FUNCTIONS_WORKER_RUNTIME" : "python",
     "TASKHUB_NAME" : "WorkflowHitlHub",
     "FOUNDRY_PROJECT_ENDPOINT" : format("https://%s.services.ai.azure.com/api/projects/%s", azapi_resource.ms_foundry.name, azapi_resource.ms_foundry_project.name),
     "FOUNDRY_DEFAULT_MODEL" : azurerm_cognitive_deployment.msfoundry_chat_deployment_model.name,

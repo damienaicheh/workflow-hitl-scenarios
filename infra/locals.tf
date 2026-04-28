@@ -23,7 +23,7 @@ locals {
     tomap(
       {
         "Environment"     = var.environment,
-        "ProjectName"     = "poc6-iac-deployment-assistant",
+        "ProjectName"     = "workflow-hitl-scenarios",
         "Domain"          = var.domain,
         "SecurityControl" = "Ignore",
         "CostControl"     = "Ignore"

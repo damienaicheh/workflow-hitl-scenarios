@@ -6,13 +6,6 @@ from agent_framework import tool
 
 
 class WorkflowHttpTools:
-    """HTTP tools used by the orchestrator agent.
-
-    Each tool is an Azure Function HTTP endpoint exposed by the workflow
-    (AgentFunctionApp). The orchestrator agent invokes them over HTTP so that
-    the workflow can be driven from anywhere, including from a Teams bot.
-    """
-
     def __init__(self) -> None:
         self._base_url = os.environ["WORKFLOW_API_BASE_URL"]
         self._headers = {
@@ -55,17 +48,6 @@ class WorkflowHttpTools:
         ],
         options: Annotated[str, "Free text describing SKU, tier, extra features."],
     ) -> dict[str, Any]:
-        """Start a new IaC deployment workflow.
-
-        Args:
-            service: Azure service to deploy (e.g. "App Service", "Storage Account").
-            region: Azure region (e.g. "westeurope").
-            options: Free text describing SKU, tier, extra features.
-            recipient_email: Email address that receives the deployment summary.
-
-        Returns:
-            A dict with the created ``instance_id``.
-        """
         payload = {
             "service": service,
             "region": region,
