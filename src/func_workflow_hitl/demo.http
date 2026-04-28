@@ -15,7 +15,8 @@
 ### 5. Run: func start
 ### ============================================================================
 
-@host = https://func-dev-sln-wkf-hitl-25a4.azurewebsites.net
+@host = https://<your-function>.azurewebsites.net or http://localhost:7071
+
 @x_functions_key = <YOUR_FUNCTION_KEY_HERE_FOR_FUNCTION_APP_ONLY>
 ### 1. Start a new IaC workflow.
 
