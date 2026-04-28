@@ -163,12 +163,6 @@ class ReviewerExecutor(Executor):
                     pull_request_url=str(pull_request["pull_request_url"]),
                 )
 
-                await azure_devops_tools.get_pull_request(
-                    repository=self._ado_repository,
-                    pull_request_id=published_result.pull_request_id,
-                    project=self._ado_project,
-                )
-
                 ctx.set_state("approved_terraform", reviewed_terraform)
 
                 await ctx.request_info(
