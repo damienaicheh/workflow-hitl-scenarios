@@ -13,7 +13,7 @@
     "ADO_DEFAULT_PROJECT": "<ADO_DEFAULT_PROJECT>",
     "ADO_REPO": "<ADO_REPO>",
     "ACS_EMAIL_CONNECTION_STRING": "<ACS_EMAIL_CONNECTION_STRING>",
-    "ACS_EMAIL_SENDER": "<DoNotReply@example.azurecomm.net>",
+    "ACS_EMAIL_SENDER": "DoNotReply@<acs-domain>.azurecomm.net",
     "ACS_RECIPIENT_EMAIL": "<ACS_RECIPIENT_EMAIL>"
   }
 }
