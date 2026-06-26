@@ -16,6 +16,15 @@
 ### 3. Configure local.settings.json (copy from local.settings.json.template)
 ### 4. az login
 ### 5. Run: func start
+###
+### BREAKING CHANGE — workflow routes are now scoped by workflow name. The newer
+### agent-framework package renames the single-workflow routes from
+###   /api/workflow/run, /api/workflow/status/{id}, /api/workflow/respond/{id}/{req}
+### to
+###   /api/workflow/{name}/run, /api/workflow/{name}/status/{id},
+###   /api/workflow/{name}/respond/{id}/{req}
+### The workflow here is named "iac_deployment", so every call below uses
+### /api/workflow/iac_deployment/... . Update any old /api/workflow/run callers.
 ### ============================================================================
 
 @host = https://<your-function>.azurewebsites.net or http://localhost:7071
