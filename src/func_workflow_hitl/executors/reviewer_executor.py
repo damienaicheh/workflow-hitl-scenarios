@@ -161,7 +161,10 @@ class ReviewerExecutor(Executor):
         ctx: WorkflowContext[dict | ReviewerNotification],
     ) -> None:
         if response.approved:
-            await ctx.send_message(original_request.publisher_result_payload)
+            # Target the summary explicitly. The reviewer now also has an edge to the
+            # notify executor, so an untargeted send would broadcast the publisher
+            # payload to notify too (which only handles ReviewerNotification).
+            await ctx.send_message(original_request.publisher_result_payload, target_id="summary_executor")
             return
 
         feedback = response.feedback or "Please improve the Terraform configuration."
