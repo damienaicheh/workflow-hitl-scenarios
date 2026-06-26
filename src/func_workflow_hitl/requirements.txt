@@ -1,11 +1,13 @@
-agent-framework-core==1.1.0
-agent-framework-foundry==1.1.0
-# agent-framework-durabletask and -azurefunctions are pinned to the unreleased
-# branch that adds WorkflowHitlContext (HITL respond-URL addressing from inside a
-# workflow). Swap these back to a published version once it ships.
-# See microsoft/agent-framework PR: ahmedmuhsin:feature/python-durabletask-workflow-hitl-context
-agent-framework-durabletask @ git+https://github.com/ahmedmuhsin/agent-framework.git@feature/python-durabletask-workflow-hitl-context#subdirectory=python/packages/durabletask
-agent-framework-azurefunctions @ git+https://github.com/ahmedmuhsin/agent-framework.git@feature/python-durabletask-workflow-hitl-context#subdirectory=python/packages/azurefunctions
+agent-framework-core==1.9.0
+agent-framework-foundry==1.8.2
+# Local wheels for the unreleased WorkflowHitlContext feature (HITL respond-URL
+# addressing from inside a workflow). They are self-contained, so no internal feed is
+# needed for these two packages. Built from microsoft/agent-framework PR
+# ahmedmuhsin:feature/python-durabletask-workflow-hitl-context. Replace with a
+# published version once it ships. (agent-framework-core was bumped from 1.1.0 and
+# -foundry from 1.1.0 because the feature targets the 1.9 line.)
+./wheels/agent_framework_durabletask-1.0.0b260626-py3-none-any.whl
+./wheels/agent_framework_azurefunctions-1.0.0b260626-py3-none-any.whl
 agent-framework-orchestrations==1.0.0b260409
 mcp==1.27.0
 python-dotenv==1.1.1
