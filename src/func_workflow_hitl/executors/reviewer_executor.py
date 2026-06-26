@@ -5,9 +5,11 @@ from agent_framework import (
     handler,
     response_handler,
 )
+from agent_framework_azurefunctions import WorkflowHitlContext
 from models.publisher_result import PublisherResult
 from models.reviewer_approval_request import ReviewerApprovalRequest
 from models.reviewer_approval_response import ReviewerApprovalResponse
+from models.reviewer_notification import ReviewerNotification
 from models.terraform_bundle import TerraformBundle
 from pydantic import ValidationError
 from utils.agent_runtime import managed_agent
@@ -72,7 +74,7 @@ class ReviewerExecutor(Executor):
     async def review(
         self,
         draft_output: str,
-        ctx: WorkflowContext[dict],
+        ctx: WorkflowContext[dict | ReviewerNotification],
     ) -> None:
         async with managed_agent(self._reviewer_agent):
             reviewer_response = await self._reviewer_agent.run(
@@ -127,21 +129,36 @@ class ReviewerExecutor(Executor):
 
                 ctx.set_state("approved_terraform", reviewed_terraform)
 
-                await ctx.request_info(
-                    self._build_review_request(
-                        reviewed_terraform,
-                        summary,
-                        published_result.model_dump(mode="json"),
-                    ),
-                    ReviewerApprovalResponse,
+                review_request = self._build_review_request(
+                    reviewed_terraform,
+                    summary,
+                    published_result.model_dump(mode="json"),
                 )
+
+                # Pause for human approval. request_info generates the request id; read
+                # it back so the notifier can build the respond URL and email the human
+                # an approve/reject link, instead of making them poll the status
+                # endpoint for the instance id and request id.
+                await ctx.request_info(review_request, ReviewerApprovalResponse)
+                request_id = await WorkflowHitlContext.pending_request_id(ctx)
+
+                if request_id is not None:
+                    await ctx.send_message(
+                        ReviewerNotification(
+                            request_id=request_id,
+                            summary=summary,
+                            pull_request_id=published_result.pull_request_id,
+                            pull_request_url=published_result.pull_request_url,
+                        ),
+                        target_id="notify_executor",
+                    )
 
     @response_handler
     async def handle_review(
         self,
         original_request: ReviewerApprovalRequest,
         response: ReviewerApprovalResponse,
-        ctx: WorkflowContext[dict],
+        ctx: WorkflowContext[dict | ReviewerNotification],
     ) -> None:
         if response.approved:
             await ctx.send_message(original_request.publisher_result_payload)

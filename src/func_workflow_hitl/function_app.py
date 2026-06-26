@@ -13,6 +13,7 @@ from configs.ado_config import AdoConfig
 from dotenv import load_dotenv
 from executors.drafter_executor import DrafterExecutor
 from executors.input_router_executor import InputRouterExecutor
+from executors.notify_executor import NotifyExecutor
 from executors.reviewer_executor import ReviewerExecutor
 from executors.summary_executor import SummaryExecutor
 from utils.env import create_azure_credential
@@ -45,12 +46,16 @@ def create_workflow() -> Workflow:
     drafter_executor = DrafterExecutor(drafter_agent)
     reviewer_executor = ReviewerExecutor(reviewer_agent, drafter_agent, publisher_agent)
     summary_executor = SummaryExecutor(summary_agent)
+    notify_executor = NotifyExecutor()
 
+    # Named so the workflow's HTTP routes and the respond URL the notifier emails share
+    # the same `workflow/iac_deployment/...` shape.
     return (
-        WorkflowBuilder(start_executor=input_router)
+        WorkflowBuilder(name="iac_deployment", start_executor=input_router)
         .add_edge(input_router, drafter_executor)
         .add_edge(drafter_executor, reviewer_executor)
         .add_edge(reviewer_executor, summary_executor)
+        .add_edge(reviewer_executor, notify_executor)
         .build()
     )
 
