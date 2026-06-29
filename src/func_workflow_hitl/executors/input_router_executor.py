@@ -15,7 +15,7 @@ class InputRouterExecutor(Executor):
         super().__init__(id="input_router")
 
     @handler
-    async def route_input(self, input_data: str, ctx: WorkflowContext[str]) -> None:
+    async def route_input(self, input_data: dict, ctx: WorkflowContext[str]) -> None:
         data = json.loads(input_data) if isinstance(input_data, str) else input_data
         request = InfraRequest.model_validate(data)
 
